@@ -1,49 +1,47 @@
-void usage () {
-	printf("  Usage:\n	-f	Set name of folder created for project (default is \"Sandbox\")\n	-n	Override the tweak name\n	-p	Directly plug in number (usually for consecutive dumps)\n	-d	Only print available patches, don't do anything (cannot be used with any other options\n\n");
-	exit(-1);
-}
+#import <Foundation/Foundation.h>
 
 int main (int argc, char **argv) {
-	int choice = -1;
-	NSString *sandbox = @"Sandbox";
+    int choice = -1;
+    NSString *sandbox = @"Sandbox";
     NSString *name = @"by ipad_kid and open source on GitHub (ipadkid358/FlexToTheos)";
     int dump = 0;
-	int c;
-
-	while ((c = getopt (argc, argv, "f:n:p:d")) != -1)
-	switch(c) {
-		case 'f': 
-			sandbox = [[[NSString stringWithFormat:@"%s", optarg] componentsSeparatedByCharactersInSet:[[NSCharacterSet alphanumericCharacterSet] invertedSet]] componentsJoinedByString:@""];
-			break;
-		case 'n':
-			name = [NSString stringWithFormat:@"%s", optarg];
-			break;
-		case 'p':
-			choice = [NSString stringWithFormat:@"%s", optarg].intValue;
-			break;
-		case 'd':
-			dump = 1;
-			break;
-		case '?':
-			usage();
-			break;
-		}
+    int c;
+    
+    while ((c = getopt (argc, argv, "f:n:p:d")) != -1)
+        switch(c) {
+            case 'f':
+                sandbox = [[[NSString stringWithFormat:@"%s", optarg] componentsSeparatedByCharactersInSet:[[NSCharacterSet alphanumericCharacterSet] invertedSet]] componentsJoinedByString:@""];
+                break;
+            case 'n':
+                name = [NSString stringWithFormat:@"%s", optarg];
+                break;
+            case 'p':
+                choice = [NSString stringWithFormat:@"%s", optarg].intValue;
+                break;
+            case 'd':
+                dump = 1;
+                break;
+            case '?':
+                printf("  Usage:\n	-f	Set name of folder created for project (default is \"Sandbox\")\n	-n	Override the tweak name\n	-p	Directly plug in number (usually for consecutive dumps)\n	-d	Only print available patches, don't do anything (cannot be used with any other options\n\n");
+                exit(-1);
+                break;
+        }
     NSDictionary *file = [[NSDictionary alloc] initWithContentsOfFile:@"/var/mobile/Library/Application Support/Flex3/patches.plist"];
     if (choice == -1) {
-    for (int choose = 0; choose < [file[@"patches"] count]; choose++) {
-    printf("  %i: ", choose);
-    printf("%s\n", [file[@"patches"][choose][@"name"] UTF8String]);
-	} // Close choose for loop
-	if (dump) exit(0);
-	printf("Enter corresponding number: ");
-    scanf("%i", &choice);
-}
-   NSDictionary *patch = file[@"patches"][choice];
+        for (int choose = 0; choose < [file[@"patches"] count]; choose++) {
+            printf("  %i: ", choose);
+            printf("%s\n", [file[@"patches"][choose][@"name"] UTF8String]);
+        } // Close choose for loop
+        if (dump) exit(0);
+        printf("Enter corresponding number: ");
+        scanf("%i", &choice);
+    }
+    NSDictionary *patch = file[@"patches"][choice];
     // Dictionary is called "patch"
     
     // Creating sandbox
     [NSFileManager.defaultManager createDirectoryAtPath:sandbox withIntermediateDirectories:NO attributes:NULL error:NULL];
-
+    
     // Makefile handling
     if ([name isEqual:@"by ipad_kid and open source on GitHub (ipadkid358/FlexToTheos)"]) name = patch[@"name"];
     NSString *title = [[name componentsSeparatedByCharactersInSet:[[NSCharacterSet alphanumericCharacterSet] invertedSet]] componentsJoinedByString:@""];
@@ -108,7 +106,7 @@ int main (int argc, char **argv) {
                 [xm appendString:[NSString stringWithFormat:@"arg%i = %@;\n", argument, objValue]];
             }
         } // Closing arguments for loop
-            if ([allOverrides count] == 0 || [allOverrides[0][@"argument"] intValue] > 0) {
+        if ([allOverrides count] == 0 || [allOverrides[0][@"argument"] intValue] > 0) {
             if ([displayName[0] isEqual:@"-(void"]) {
                 [xm appendString:[NSString stringWithFormat:@"%%orig;\n"]];
             } else {
@@ -121,6 +119,6 @@ int main (int argc, char **argv) {
     [xm writeToFile:[NSString stringWithFormat:@"%@/Tweak.xm", sandbox] atomically:YES encoding:NSUTF8StringEncoding error:NULL];
     [makefile appendString:@"include $(THEOS_MAKE_PATH)/tweak.mk"];
     [makefile writeToFile:[NSString stringWithFormat:@"%@/Makefile", sandbox] atomically:YES encoding:NSUTF8StringEncoding error:NULL];
-   printf("Project %s created in %s\n", title.UTF8String, sandbox.UTF8String);
+    printf("Project %s created in %s\n", title.UTF8String, sandbox.UTF8String);
     return 0;
 } // Closing main
