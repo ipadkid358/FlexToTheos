@@ -3,10 +3,8 @@
 Enter a number and get a Theos project. Fairly straight forward CLI
 
 TODOs: 
- - Option to name "Sandbox" directory
- - Support for Swift apps
- - Option to only create Tweak.xm 
- - Option to force `dylib`/`plist`/`bundleID`/`name` names
+ - Support for Swift methods
+ - Option to only create Tweak.xm (and copy to clipboard?)
 
 Compile: `make; cp .theos/obj/debug/ftt .`
 
