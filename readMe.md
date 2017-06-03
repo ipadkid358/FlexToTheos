@@ -8,6 +8,15 @@ TODOs:
 
 Compile: `make; cp .theos/obj/debug/ftt .`
 
+```
+Usage:
+	-f	Set name of folder created for project (default is "Sandbox")
+	-n	Override the tweak name
+	-p	Directly plug in number (usually for consecutive dumps)
+	-d	Only print available patches, don't do anything (cannot be used with any other options
+```
+
+
 My "Control B" file: 
 
 ```bash
