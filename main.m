@@ -30,7 +30,7 @@ int main (int argc, char **argv) {
                 exit(-1);
                 break;
         }
-    NSDictionary *file = [[NSDictionary alloc] initWithContentsOfFile:@"/Users/ipad_kid/Downloads/patches.plist"]; // /var/mobile/Library/Application Support/Flex3/patches.plist
+    NSDictionary *file = [[NSDictionary alloc] initWithContentsOfFile:@"/var/mobile/Library/Application Support/Flex3/patches.plist"]; // /Users/ipad_kid/Downloads/patches.plist
     if (choice == -1) {
         for (int choose = 0; choose < [file[@"patches"] count]; choose++) {
             printf("  %i: ", choose);
