@@ -69,7 +69,7 @@ int main (int argc, char **argv) {
     
     // Tweak.xm handling
     NSMutableString *xm = [NSMutableString new];
-    for (int top = 0; top < [patch[@"units"] count]; top++) {
+    for (id top in patch[@"units"]) {
         NSDictionary *units = patch[@"units"][top][@"methodObjc"];
         
         // Class name handling
@@ -78,7 +78,7 @@ int main (int argc, char **argv) {
         // Method name handling
         NSArray *displayName = [units[@"displayName"] componentsSeparatedByString:@")"];
         [xm appendString:[NSString stringWithFormat:@"%@)%@", displayName[0], displayName[1]]];
-        for (int methodBreak = 2; methodBreak < [displayName count]; methodBreak++) {
+        for (id methodBreak in displayName) {
             [xm appendString:[NSString stringWithFormat:@")arg%i%@", methodBreak-1, displayName[methodBreak]]];
         } // Closing method name handling for loop
         
@@ -86,7 +86,7 @@ int main (int argc, char **argv) {
         
         // Argument handling
         NSArray *allOverrides = patch[@"units"][top][@"overrides"];
-        for (int arg = 0; arg < [allOverrides count]; arg++) {
+        for (id arg in allOverrides) {
             NSDictionary *override = allOverrides[arg];
             NSString *origValue = override[@"value"][@"value"];
             NSString *objValue;
