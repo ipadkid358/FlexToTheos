@@ -3,8 +3,7 @@
 Enter a number and get a Theos project. Fairly straight forward CLI
 
 TODOs: 
- - Support for Swift classes
- - Fix `UIPasteboard` logging 
+ - Support for Swift classes 
 
 Compile: `make; cp .theos/obj/debug/ftt .`
 

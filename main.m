@@ -108,9 +108,9 @@ int main (int argc, char **argv) {
     if ([name isEqual:@"by ipad_kid and open source on GitHub (ipadkid358/FlexToTheos)"]) name = patch[@"name"];
     NSString *title = [[name componentsSeparatedByCharactersInSet:[[NSCharacterSet alphanumericCharacterSet] invertedSet]] componentsJoinedByString:@""];
     NSMutableString *makefile = [NSMutableString new];
-    [makefile appendString:[NSString stringWithFormat:@"include $(THEOS)/makefiles/common.mk\nTWEAK_NAME = %@\n%@_FILES = Tweak.xm\n", title, title]];
+    [makefile appendString:[NSString stringWithFormat:@"include $(THEOS)/makefiles/common.mk\n\nTWEAK_NAME = %@\n%@_FILES = Tweak.xm\n", title, title]];
     if (uikit) [makefile appendString:[NSString stringWithFormat:@"%@_FRAMEWORKS = UIKit\n", title]];
-    [makefile appendString:@"include $(THEOS_MAKE_PATH)/tweak.mk"];
+    [makefile appendString:@"\ninclude $(THEOS_MAKE_PATH)/tweak.mk"];
     [makefile writeToFile:[NSString stringWithFormat:@"%@/Makefile", sandbox] atomically:YES encoding:NSUTF8StringEncoding error:NULL];
     
     // plist handling
@@ -130,9 +130,11 @@ int main (int argc, char **argv) {
     printf("Project %s created in %s\n", title.UTF8String, sandbox.UTF8String);
     } else { // Close tweak if statement 
     printf("\n\n%s", xm.UTF8String); 
+    freopen([@"/dev/null" cStringUsingEncoding:NSASCIIStringEncoding], "a+", stderr);
     [UIPasteboard.generalPasteboard setString:xm];
-    printf(" ^^ that means the output was successfully copied to clipboard. You can now easily paste this output in your .xm file\n\n");
-    if (uikit) printf("\nPlease add UIKit to your project's FRAMEWORKS because this tweak includes colors\n\n");
+    printf("Output has been successfully copied to your clipboard. You can now easily paste this output in your .xm file\n");
+    if (uikit) printf("\nPlease add UIKit to your project's FRAMEWORKS because this tweak includes color specifying\n");
+    printf("\n");
 } // Close tweak else statement 
     return 0;
 } // Closing main
