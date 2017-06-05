@@ -1,17 +1,22 @@
 #import <Foundation/Foundation.h>
 
 int main (int argc, char **argv) {
+    
     int choice = -1;
     NSString *version = @"0.0.1";
     NSString *sandbox = @"Sandbox";
     NSString *name = @"by ipad_kid and open source on GitHub (ipadkid358/FlexToTheos)";
     int dump = 0;
-    int c;
     
+    int c;
     while ((c = getopt (argc, argv, "f:n:v:p:d")) != -1)
         switch(c) {
             case 'f':
-                sandbox = [[[NSString stringWithFormat:@"%s", optarg] componentsSeparatedByCharactersInSet:[[NSCharacterSet alphanumericCharacterSet] invertedSet]] componentsJoinedByString:@""];
+                sandbox = [NSString stringWithFormat:@"%s", optarg];
+                if ([sandbox componentsSeparatedByString:@" "].count > 0) {
+                    printf("Invalid folder name, spaces are not allowed\n");
+                    exit(-1);
+                }
                 break;
             case 'n':
                 name = [NSString stringWithFormat:@"%s", optarg];
@@ -26,20 +31,28 @@ int main (int argc, char **argv) {
                 dump = 1;
                 break;
             case '?':
-                printf("\n  Usage: %s [OPTIONS]\n	-f	Set name of folder created for project (default is \"%s\")\n	-n	Override the tweak name\n	-v  Set version (default is  %s)\n	-p	Directly plug in number (usually for consecutive dumps)\n	-d	Only print available patches, don't do anything (cannot be used with any other options)\n\n", argv[0], sandbox.UTF8String, version.UTF8String);
+                printf("\n  Usage: %s [OPTIONS]\n   Options:\n	-f	Set name of folder created for project (default is \"%s\")\n	-n	Override the tweak name\n	-v	Set version (default is  %s)\n	-p	Directly plug in number (usually for consecutive dumps)\n	-d	Only print available patches, don't do anything (cannot be used with any other options)\n\n", argv[0], sandbox.UTF8String, version.UTF8String);
                 exit(-1);
                 break;
         }
-    NSDictionary *file = [[NSDictionary alloc] initWithContentsOfFile:@"/var/mobile/Library/Application Support/Flex3/patches.plist"]; // /Users/ipad_kid/Downloads/patches.plist
+    
+    // Handles the annoying issue of switching plists when testing on iOS vs developing with Xcode
+    NSDictionary *file;
+    BOOL whichPlist = [NSFileManager.defaultManager fileExistsAtPath:@"/var/mobile/Library/Application Support/Flex3/patches.plist"];
+    if (whichPlist) file = [[NSDictionary alloc] initWithContentsOfFile:@"/var/mobile/Library/Application Support/Flex3/patches.plist"];
+    else file = [[NSDictionary alloc] initWithContentsOfFile:@"/Users/ipad_kid/Downloads/patches.plist"];
+    
     if (choice == -1) {
         for (int choose = 0; choose < [file[@"patches"] count]; choose++) {
             printf("  %i: ", choose);
             printf("%s\n", [file[@"patches"][choose][@"name"] UTF8String]);
         } // Close choose for loop
+        
         if (dump) exit(0);
         printf("Enter corresponding number: ");
         scanf("%i", &choice);
-    }
+    } // Close choice if statement
+    
     NSDictionary *patch = file[@"patches"][choice];
     // Dictionary is called "patch"
     
@@ -54,11 +67,8 @@ int main (int argc, char **argv) {
     
     // plist handling
     NSString *executable;
-    if ([patch[@"applicationIdentifier"] isEqual: @"com.flex.systemwide"]) {
-        executable = @"com.apple.UIKit";
-    } else {
-        executable = patch[@"appIdentifier"];
-    }
+    if ([patch[@"applicationIdentifier"] isEqual: @"com.flex.systemwide"]) executable = @"com.apple.UIKit";
+    else executable = patch[@"appIdentifier"];
     NSDictionary *plist = @{@"Filter": @{@"Bundles": executable}};
     NSString *plistPath = [NSString stringWithFormat:@"%@/%@.plist", sandbox, title];
     [plist writeToFile:plistPath atomically:YES];
@@ -67,7 +77,6 @@ int main (int argc, char **argv) {
     NSString *author = [[patch[@"author"] componentsSeparatedByCharactersInSet:[[NSCharacterSet alphanumericCharacterSet] invertedSet]] componentsJoinedByString:@""];
     NSString *description = [patch[@"cloudDescription"] stringByReplacingOccurrencesOfString:@"\n" withString:@"\n "];
     NSString *control = [NSString stringWithFormat:@"Package: com.%@.%@\nName: %@\nAuthor: %@\nDescription: %@\nDepends: mobilesubstrate\nMaintainer: ipad_kid <ipadkid358@gmail.com>\nArchitecture: iphoneos-arm\nSection: Tweaks\nVersion: %@\n", author, title, name, author, description, version];
-    if ([version isEqual:@"0.0.1"]) printf("By default, the Debian Version field has been set to %s\n", version.UTF8String);
     [control writeToFile:[NSString stringWithFormat:@"%@/control", sandbox] atomically:YES encoding:NSUTF8StringEncoding error:NULL];
     
     
@@ -82,10 +91,7 @@ int main (int argc, char **argv) {
         // Method name handling
         NSArray *displayName = [units[@"displayName"] componentsSeparatedByString:@")"];
         [xm appendString:[NSString stringWithFormat:@"%@)%@", displayName[0], displayName[1]]];
-        for (int methodBreak = 2; methodBreak < [displayName count]; methodBreak++) {
-            [xm appendString:[NSString stringWithFormat:@")arg%i%@", methodBreak-1, displayName[methodBreak]]];
-        } // Closing method name handling for loop
-        
+        for (int methodBreak = 2; methodBreak < [displayName count]; methodBreak++) [xm appendString:[NSString stringWithFormat:@")arg%i%@", methodBreak-1, displayName[methodBreak]]];
         [xm appendString:@" { \n"];
         
         // Argument handling
@@ -93,28 +99,21 @@ int main (int argc, char **argv) {
         for (NSDictionary *override in allOverrides) {
             NSString *origValue = override[@"value"][@"value"];
             NSString *objValue;
-            if ([origValue isKindOfClass:[NSString class]] && [[origValue substringToIndex:8] isEqual:@"(FLNULL)"]) {
-                objValue = @"nil";
-            } else if ([origValue isKindOfClass:[NSString class]] && [[origValue substringToIndex:8] isEqual:@"FLcolor:"]) {
+            if ([origValue isKindOfClass:[NSString class]] && [[origValue substringToIndex:8] isEqual:@"(FLNULL)"]) objValue = @"nil";
+            else if ([origValue isKindOfClass:[NSString class]] && [[origValue substringToIndex:8] isEqual:@"FLcolor:"]) {
                 NSArray *color = [[origValue substringFromIndex:8] componentsSeparatedByString:@","];
                 objValue = [NSString stringWithFormat:@"[UIColor colorWithRed:%@.0/255.0 green:%@.0/255.0 blue:%@.0/255.0 alpha:%@.0/255.0]", color[0], color[1], color[2], color[3]];
                 [makefile appendString:[NSString stringWithFormat:@"%@_FRAMEWORKS = UIKit\n", title]];
-            } else {
-                objValue = origValue;
-            }
+            } else objValue = origValue;
+            
             int argument = [override[@"argument"] intValue];
-            if (argument == 0) {
-                [xm appendString:[NSString stringWithFormat:@"return %@; \n", objValue]];
-            } else {
-                [xm appendString:[NSString stringWithFormat:@"arg%i = %@;\n", argument, objValue]];
-            }
+            if (argument == 0) [xm appendString:[NSString stringWithFormat:@"return %@; \n", objValue]];
+            else [xm appendString:[NSString stringWithFormat:@"arg%i = %@;\n", argument, objValue]];
         } // Closing arguments for loop
+        
         if ([allOverrides count] == 0 || [allOverrides[0][@"argument"] intValue] > 0) {
-            if ([displayName[0] isEqual:@"-(void"]) {
-                [xm appendString:[NSString stringWithFormat:@"%%orig;\n"]];
-            } else {
-                [xm appendString:[NSString stringWithFormat:@"return %%orig;\n"]];
-            } // Closing type check if statement
+            if ([displayName[0] isEqual:@"-(void"]) [xm appendString:[NSString stringWithFormat:@"%%orig;\n"]];
+            else [xm appendString:[NSString stringWithFormat:@"return %%orig;\n"]];
         } // Closing not zero if statement
         [xm appendString:[NSString stringWithFormat:@"} \n%%end\n"]];
         
