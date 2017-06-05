@@ -3,13 +3,13 @@
 Enter a number and get a Theos project. Fairly straight forward CLI
 
 TODOs: 
- - Support for Swift methods
- - Option to only create Tweak.xm (and copy to clipboard?)
+ - Support for Swift classes
+ - Fix `UIPasteboard` logging 
 
 Compile: `make; cp .theos/obj/debug/ftt .`
 
 ```
-Usage ./ftt [OPTIONS]:
+Usage: ./ftt [OPTIONS]
     Options: 
 		-f  Set name of folder created for project (default is "Sandbox")
 		-n  Override the tweak name
@@ -19,7 +19,9 @@ Usage ./ftt [OPTIONS]:
 ```
 
 
-My "Control B" file: 
+My "Command-B" file: 
+
+(I have a file called `b` with the contents below, and just type `./b` when I'm in the project for quick run and testing)
 
 ```bash
 test -f ftt && rm ftt 
