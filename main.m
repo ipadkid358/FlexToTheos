@@ -34,11 +34,11 @@ int main (int argc, char **argv) {
                 tweak = NO;
                 break;
             case '?':
-                printf("\n  Usage: %s [OPTIONS]\n   Options:\n	-f	Set name of folder created for project (default is %s)\n	-n	Override the tweak name\n	-v	Set version (default is  %s)\n	-p	Directly plug in number (usually for consecutive dumps)\n	-d	Only print available patches, don't do anything (cannot be used with any other options)\n	-t	Only print Tweak.xm to console (beta option)\n\n", argv[0], sandbox.UTF8String, version.UTF8String);
+                printf("\n  Usage: %s [OPTIONS]\n   Options:\n	-f	Set name of folder created for project (default is %s)\n	-n	Override the tweak name\n	-v	Set version (default is  %s)\n	-p	Directly plug in number (usually for consecutive dumps)\n	-d	Only print available patches, don't do anything (cannot be used with any other options)\n	-t	Only print Tweak.xm to console (can only be used with -p)\n\n", argv[0], sandbox.UTF8String, version.UTF8String);
                 exit(-1);
                 break;
         }
-    
+
     // Handles the annoying issue of switching plists when testing on iOS vs developing with Xcode
     NSDictionary *file;
     if ([NSFileManager.defaultManager fileExistsAtPath:@"/var/mobile/Library/Application Support/Flex3/patches.plist"]) file = [[NSDictionary alloc] initWithContentsOfFile:@"/var/mobile/Library/Application Support/Flex3/patches.plist"];

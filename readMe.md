@@ -7,16 +7,20 @@ TODOs:
 
 Compile: `make; cp .theos/obj/debug/ftt .`
 
+[Direct binary download](https://ipadkid358.github.io/scripts/ftt) (may not be latest from source) 
+
 ```
 Usage: ./ftt [OPTIONS]
     Options: 
-		-f  Set name of folder created for project (default is "Sandbox")
-		-n  Override the tweak name
-		-v  Set version (default is  %s)
-		-p  Directly plug in number (usually for consecutive dumps)
-		-d  Only print available patches, don't do anything (cannot be used with any other options)
+	-f	Set name of folder created for project (default is "Sandbox")
+	-n	Override the tweak name
+	-v	Set version (default is  0.0.1)
+	-p	Directly plug in number (usually for consecutive dumps)
+	-d	Only print available patches, don't do anything (cannot be used with any other options)
+	-t	Only print Tweak.xm to console (can only be used with -p)
 ```
-
+ex. `./ftt -f MyFolder -n tweak -v 1.0`
+ex. `./ftt -tp2`
 
 My "Command-B" file: 
 
