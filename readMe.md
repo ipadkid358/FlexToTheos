@@ -18,9 +18,10 @@ Usage: ./ftt [OPTIONS]
 	-p	Directly plug in number (usually for consecutive dumps)
 	-d	Only print available patches, don't do anything (cannot be used with any other options)
 	-t	Only print Tweak.xm to console (can only be used with -p)
+	-s	Enable smart comments (beta option)
 ```
 ex. `./ftt -f MyFolder -n tweak -v 1.0`
-ex. `./ftt -tp2`
+ex. `./ftt -tsp2`
 
 My "Command-B" file: 
 

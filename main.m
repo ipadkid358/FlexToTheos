@@ -42,14 +42,14 @@ int main (int argc, char **argv) {
                 exit(-1);
                 break;
         }
-
+    
     // Handles the annoying issue of switching plists when testing on iOS vs developing with Xcode
     NSDictionary *file;
     if ([NSFileManager.defaultManager fileExistsAtPath:@"/var/mobile/Library/Application Support/Flex3/patches.plist"]) file = [[NSDictionary alloc] initWithContentsOfFile:@"/var/mobile/Library/Application Support/Flex3/patches.plist"];
     else if ([NSFileManager.defaultManager fileExistsAtPath:@"/Users/ipad_kid/Downloads/patches.plist"]) file = [[NSDictionary alloc] initWithContentsOfFile:@"/Users/ipad_kid/Downloads/patches.plist"];
     else {
-    	printf("File not found, please ensure Flex 3 is installed (if you're using an older version of Flex, please contact me at https://ipadkid358.github.io/contact.html)");
-    	exit(-1);
+        printf("File not found, please ensure Flex 3 is installed (if you're using an older version of Flex, please contact me at https://ipadkid358.github.io/contact.html)");
+        exit(-1);
     }
     
     if (choice == -1) {
@@ -102,48 +102,48 @@ int main (int argc, char **argv) {
             else [xm appendString:[NSString stringWithFormat:@"	return %%orig;\n"]];
         } // Closing not zero if statement
         if (smart) {
-        NSString *smartComment = top[@"name"];
-        NSString *defaultComment = [NSString stringWithFormat:@"Unit for %@", top[@"methodObjc"][@"displayName"]];
-        if (smartComment.length > 0 && !(smartComment.isEqual:defaultComment)) [xm appendString:[NSString stringWithFormat:@"	// %@\n", smartComment]];
-}
+            NSString *smartComment = top[@"name"];
+            NSString *defaultComment = [NSString stringWithFormat:@"Unit for %@", top[@"methodObjc"][@"displayName"]];
+            if (smartComment.length > 0 && !(smartComment.isEqual:defaultComment)) [xm appendString:[NSString stringWithFormat:@"	// %@\n", smartComment]];
+        }
         [xm appendString:[NSString stringWithFormat:@"} \n%%end\n\n"]];
     } // Closing top for loop
-	
+    
     if (tweak) {
-    // Creating sandbox
-    [NSFileManager.defaultManager createDirectoryAtPath:sandbox withIntermediateDirectories:NO attributes:NULL error:NULL];
-    
-    // Makefile handling
-    if ([name isEqual:@"by ipad_kid and open source on GitHub (ipadkid358/FlexToTheos)"]) name = patch[@"name"];
-    NSString *title = [[name componentsSeparatedByCharactersInSet:[[NSCharacterSet alphanumericCharacterSet] invertedSet]] componentsJoinedByString:@""];
-    NSMutableString *makefile = [NSMutableString new];
-    [makefile appendString:[NSString stringWithFormat:@"include $(THEOS)/makefiles/common.mk\n\nTWEAK_NAME = %@\n%@_FILES = Tweak.xm\n", title, title]];
-    if (uikit) [makefile appendString:[NSString stringWithFormat:@"%@_FRAMEWORKS = UIKit\n", title]];
-    [makefile appendString:@"\ninclude $(THEOS_MAKE_PATH)/tweak.mk"];
-    [makefile writeToFile:[NSString stringWithFormat:@"%@/Makefile", sandbox] atomically:YES encoding:NSUTF8StringEncoding error:NULL];
-    
-    // plist handling
-    NSString *executable;
-    if ([patch[@"applicationIdentifier"] isEqual: @"com.flex.systemwide"]) executable = @"com.apple.UIKit";
-    else executable = patch[@"appIdentifier"];
-    NSDictionary *plist = @{@"Filter": @{@"Bundles": executable}};
-    NSString *plistPath = [NSString stringWithFormat:@"%@/%@.plist", sandbox, title];
-    [plist writeToFile:plistPath atomically:YES];
-    
-    // Control file handling
-    NSString *author = [[patch[@"author"] componentsSeparatedByCharactersInSet:[[NSCharacterSet alphanumericCharacterSet] invertedSet]] componentsJoinedByString:@""];
-    NSString *description = [patch[@"cloudDescription"] stringByReplacingOccurrencesOfString:@"\n" withString:@"\n "];
-    NSString *control = [NSString stringWithFormat:@"Package: com.%@.%@\nName: %@\nAuthor: %@\nDescription: %@\nDepends: mobilesubstrate\nMaintainer: ipad_kid <ipadkid358@gmail.com>\nArchitecture: iphoneos-arm\nSection: Tweaks\nVersion: %@\n", author, title, name, author, description, version];
-    [control writeToFile:[NSString stringWithFormat:@"%@/control", sandbox] atomically:YES encoding:NSUTF8StringEncoding error:NULL];
-    [xm writeToFile:[NSString stringWithFormat:@"%@/Tweak.xm", sandbox] atomically:YES encoding:NSUTF8StringEncoding error:NULL];
-    printf("Project %s created in %s\n", title.UTF8String, sandbox.UTF8String);
-    } else { // Close tweak if statement 
-    printf("\n\n%s", xm.UTF8String); 
-    freopen([@"/dev/null" cStringUsingEncoding:NSASCIIStringEncoding], "a+", stderr);
-    [UIPasteboard.generalPasteboard setString:xm];
-    printf("Output has been successfully copied to your clipboard. You can now easily paste this output in your .xm file\n");
-    if (uikit) printf("\nPlease add UIKit to your project's FRAMEWORKS because this tweak includes color specifying\n");
-    printf("\n");
-} // Close tweak else statement 
+        // Creating sandbox
+        [NSFileManager.defaultManager createDirectoryAtPath:sandbox withIntermediateDirectories:NO attributes:NULL error:NULL];
+        
+        // Makefile handling
+        if ([name isEqual:@"by ipad_kid and open source on GitHub (ipadkid358/FlexToTheos)"]) name = patch[@"name"];
+        NSString *title = [[name componentsSeparatedByCharactersInSet:[[NSCharacterSet alphanumericCharacterSet] invertedSet]] componentsJoinedByString:@""];
+        NSMutableString *makefile = [NSMutableString new];
+        [makefile appendString:[NSString stringWithFormat:@"include $(THEOS)/makefiles/common.mk\n\nTWEAK_NAME = %@\n%@_FILES = Tweak.xm\n", title, title]];
+        if (uikit) [makefile appendString:[NSString stringWithFormat:@"%@_FRAMEWORKS = UIKit\n", title]];
+        [makefile appendString:@"\ninclude $(THEOS_MAKE_PATH)/tweak.mk"];
+        [makefile writeToFile:[NSString stringWithFormat:@"%@/Makefile", sandbox] atomically:YES encoding:NSUTF8StringEncoding error:NULL];
+        
+        // plist handling
+        NSString *executable;
+        if ([patch[@"applicationIdentifier"] isEqual: @"com.flex.systemwide"]) executable = @"com.apple.UIKit";
+        else executable = patch[@"appIdentifier"];
+        NSDictionary *plist = @{@"Filter": @{@"Bundles": executable}};
+        NSString *plistPath = [NSString stringWithFormat:@"%@/%@.plist", sandbox, title];
+        [plist writeToFile:plistPath atomically:YES];
+        
+        // Control file handling
+        NSString *author = [[patch[@"author"] componentsSeparatedByCharactersInSet:[[NSCharacterSet alphanumericCharacterSet] invertedSet]] componentsJoinedByString:@""];
+        NSString *description = [patch[@"cloudDescription"] stringByReplacingOccurrencesOfString:@"\n" withString:@"\n "];
+        NSString *control = [NSString stringWithFormat:@"Package: com.%@.%@\nName: %@\nAuthor: %@\nDescription: %@\nDepends: mobilesubstrate\nMaintainer: ipad_kid <ipadkid358@gmail.com>\nArchitecture: iphoneos-arm\nSection: Tweaks\nVersion: %@\n", author, title, name, author, description, version];
+        [control writeToFile:[NSString stringWithFormat:@"%@/control", sandbox] atomically:YES encoding:NSUTF8StringEncoding error:NULL];
+        [xm writeToFile:[NSString stringWithFormat:@"%@/Tweak.xm", sandbox] atomically:YES encoding:NSUTF8StringEncoding error:NULL];
+        printf("Project %s created in %s\n", title.UTF8String, sandbox.UTF8String);
+    } else { // Close tweak if statement
+        printf("\n\n%s", xm.UTF8String);
+        freopen([@"/dev/null" cStringUsingEncoding:NSASCIIStringEncoding], "a+", stderr);
+        [UIPasteboard.generalPasteboard setString:xm];
+        printf("Output has been successfully copied to your clipboard. You can now easily paste this output in your .xm file\n");
+        if (uikit) printf("\nPlease add UIKit to your project's FRAMEWORKS because this tweak includes color specifying\n");
+        printf("\n");
+    } // Close tweak else statement 
     return 0;
 } // Closing main
