@@ -8,12 +8,13 @@ int main (int argc, char **argv) {
     NSString *name = @"by ipad_kid and open source on GitHub (ipadkid358/FlexToTheos)";
     BOOL dump = NO;
     BOOL tweak = YES;
+    BOOL smart = NO;
     int c;
-    while ((c = getopt (argc, argv, "f:n:v:p:dt")) != -1)
+    while ((c = getopt (argc, argv, "f:n:v:p:dts")) != -1)
         switch(c) {
             case 'f':
                 sandbox = [NSString stringWithFormat:@"%s", optarg];
-                if ([sandbox componentsSeparatedByString:@" "].count > 0) {
+                if ([sandbox componentsSeparatedByString:@" "].count > 1) {
                     printf("Invalid folder name, spaces are not allowed\n");
                     exit(-1);
                 }
@@ -33,8 +34,11 @@ int main (int argc, char **argv) {
             case 't':
                 tweak = NO;
                 break;
+            case 's':
+                smart = YES;
+                break;
             case '?':
-                printf("\n  Usage: %s [OPTIONS]\n   Options:\n	-f	Set name of folder created for project (default is %s)\n	-n	Override the tweak name\n	-v	Set version (default is  %s)\n	-p	Directly plug in number (usually for consecutive dumps)\n	-d	Only print available patches, don't do anything (cannot be used with any other options)\n	-t	Only print Tweak.xm to console (can only be used with -p)\n\n", argv[0], sandbox.UTF8String, version.UTF8String);
+                printf("\n  Usage: %s [OPTIONS]\n   Options:\n	-f	Set name of folder created for project (default is %s)\n	-n	Override the tweak name\n	-v	Set version (default is  %s)\n	-p	Directly plug in number (usually for consecutive dumps)\n	-d	Only print available patches, don't do anything (cannot be used with any other options)\n	-t	Only print Tweak.xm to console\n	-s	Enable smart comments (beta option)\n\n", argv[0], sandbox.UTF8String, version.UTF8String);
                 exit(-1);
                 break;
         }
@@ -97,6 +101,11 @@ int main (int argc, char **argv) {
             if ([displayName[0] isEqual:@"-(void"]) [xm appendString:[NSString stringWithFormat:@"	%%orig;\n"]];
             else [xm appendString:[NSString stringWithFormat:@"	return %%orig;\n"]];
         } // Closing not zero if statement
+        if (smart) {
+        NSString *smartComment = top[@"name"];
+        NSString *defaultComment = [NSString stringWithFormat:@"Unit for %@", top[@"methodObjc"][@"displayName"]];
+        if (smartComment.length > 0 && !(smartComment.isEqual:defaultComment)) [xm appendString:[NSString stringWithFormat:@"	// %@\n", smartComment]];
+}
         [xm appendString:[NSString stringWithFormat:@"} \n%%end\n\n"]];
     } // Closing top for loop
 	
