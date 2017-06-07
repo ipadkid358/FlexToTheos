@@ -104,7 +104,7 @@ int main (int argc, char **argv) {
         if (smart) {
             NSString *smartComment = top[@"name"];
             NSString *defaultComment = [NSString stringWithFormat:@"Unit for %@", top[@"methodObjc"][@"displayName"]];
-            if (smartComment.length > 0 && !(smartComment.isEqual:defaultComment)) [xm appendString:[NSString stringWithFormat:@"	// %@\n", smartComment]];
+            if (smartComment.length > 0 && !([smartComment isEqual:defaultComment])) [xm appendString:[NSString stringWithFormat:@"	// %@\n", smartComment]];
         }
         [xm appendString:[NSString stringWithFormat:@"} \n%%end\n\n"]];
     } // Closing top for loop

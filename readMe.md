@@ -20,7 +20,8 @@ Usage: ./ftt [OPTIONS]
 	-t	Only print Tweak.xm to console (can only be used with -p)
 	-s	Enable smart comments (beta option)
 ```
-ex. `./ftt -f MyFolder -n tweak -v 1.0`
+ex. `./ftt -f MyFolder -n tweak -v 1.0` 
+
 ex. `./ftt -tsp2`
 
 My "Command-B" file: 
