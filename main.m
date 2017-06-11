@@ -9,8 +9,9 @@ int main (int argc, char **argv) {
     BOOL dump = NO;
     BOOL tweak = YES;
     BOOL smart = NO;
+    BOOL getPlist = NO;
     int c;
-    while ((c = getopt (argc, argv, "f:n:v:p:dts")) != -1)
+    while ((c = getopt (argc, argv, "f:n:v:p:dtsg")) != -1)
         switch(c) {
             case 'f':
                 sandbox = [NSString stringWithFormat:@"%s", optarg];
@@ -37,6 +38,9 @@ int main (int argc, char **argv) {
             case 's':
                 smart = YES;
                 break;
+            case 'g':
+                getPlist = YES;
+                break;
             case '?':
                 printf("\n  Usage: %s [OPTIONS]\n   Options:\n	-f	Set name of folder created for project (default is %s)\n	-n	Override the tweak name\n	-v	Set version (default is  %s)\n	-p	Directly plug in number (usually for consecutive dumps)\n	-d	Only print available patches, don't do anything (cannot be used with any other options)\n	-t	Only print Tweak.xm to console\n	-s	Enable smart comments (beta option)\n\n", argv[0], sandbox.UTF8String, version.UTF8String);
                 exit(-1);
@@ -45,7 +49,14 @@ int main (int argc, char **argv) {
     
     // Handles the annoying issue of switching plists when testing on iOS vs developing with Xcode
     NSDictionary *file;
-    if ([NSFileManager.defaultManager fileExistsAtPath:@"/var/mobile/Library/Application Support/Flex3/patches.plist"]) file = [[NSDictionary alloc] initWithContentsOfFile:@"/var/mobile/Library/Application Support/Flex3/patches.plist"];
+    if (getPlist) { 
+    // Thanks: https://stackoverflow.com/a/16249252
+    NSString *plistDataString = [NSString stringWithContentsOfURL:[NSURL URLWithString:@"https://ipadkid358.github.io/ftt/patches.plist"] encoding:NSUTF8StringEncoding error:nil];
+	NSData* plistData = [plistDataString dataUsingEncoding:NSUTF8StringEncoding];
+NSPropertyListFormat format;
+	file = [NSPropertyListSerialization propertyListFromData:plistData mutabilityOption:NSPropertyListImmutable format:&format errorDescription:NULL];
+    }
+    else if ([NSFileManager.defaultManager fileExistsAtPath:@"/var/mobile/Library/Application Support/Flex3/patches.plist"]) file = [[NSDictionary alloc] initWithContentsOfFile:@"/var/mobile/Library/Application Support/Flex3/patches.plist"];
     else if ([NSFileManager.defaultManager fileExistsAtPath:@"/Users/ipad_kid/Downloads/patches.plist"]) file = [[NSDictionary alloc] initWithContentsOfFile:@"/Users/ipad_kid/Downloads/patches.plist"];
     else {
         printf("File not found, please ensure Flex 3 is installed (if you're using an older version of Flex, please contact me at https://ipadkid358.github.io/contact.html)");
@@ -84,17 +95,15 @@ int main (int argc, char **argv) {
         NSArray *allOverrides = top[@"overrides"];
         for (NSDictionary *override in allOverrides) {
             NSString *origValue = override[@"value"][@"value"];
-            NSString *objValue;
-            if ([origValue isKindOfClass:[NSString class]] && [[origValue substringToIndex:8] isEqual:@"(FLNULL)"]) objValue = @"nil";
+            if ([origValue isKindOfClass:[NSString class]] && [[origValue substringToIndex:8] isEqual:@"(FLNULL)"]) origValue = @"nil";
             else if ([origValue isKindOfClass:[NSString class]] && [[origValue substringToIndex:8] isEqual:@"FLcolor:"]) {
                 NSArray *color = [[origValue substringFromIndex:8] componentsSeparatedByString:@","];
-                objValue = [NSString stringWithFormat:@"[UIColor colorWithRed:%@.0/255.0 green:%@.0/255.0 blue:%@.0/255.0 alpha:%@.0/255.0]", color[0], color[1], color[2], color[3]];
+                origValue = [NSString stringWithFormat:@"[UIColor colorWithRed:%@.0/255.0 green:%@.0/255.0 blue:%@.0/255.0 alpha:%@.0/255.0]", color[0], color[1], color[2], color[3]];
                 uikit = YES;
-            } else objValue = origValue;
-            
+            }
             int argument = [override[@"argument"] intValue];
-            if (argument == 0) [xm appendString:[NSString stringWithFormat:@"	return %@; \n", objValue]];
-            else [xm appendString:[NSString stringWithFormat:@"	arg%i = %@;\n", argument, objValue]];
+            if (argument == 0) [xm appendString:[NSString stringWithFormat:@"	return %@; \n", origValue]];
+            else [xm appendString:[NSString stringWithFormat:@"	arg%i = %@;\n", argument, origValue]];
         } // Closing arguments for loop
         
         if ([allOverrides count] == 0 || [allOverrides[0][@"argument"] intValue] > 0) {
@@ -105,7 +114,7 @@ int main (int argc, char **argv) {
             NSString *smartComment = top[@"name"];
             NSString *defaultComment = [NSString stringWithFormat:@"Unit for %@", top[@"methodObjc"][@"displayName"]];
             if (smartComment.length > 0 && !([smartComment isEqual:defaultComment])) [xm appendString:[NSString stringWithFormat:@"	// %@\n", smartComment]];
-        }
+        } // Close smart if statement  
         [xm appendString:[NSString stringWithFormat:@"} \n%%end\n\n"]];
     } // Closing top for loop
     
@@ -123,9 +132,8 @@ int main (int argc, char **argv) {
         [makefile writeToFile:[NSString stringWithFormat:@"%@/Makefile", sandbox] atomically:YES encoding:NSUTF8StringEncoding error:NULL];
         
         // plist handling
-        NSString *executable;
-        if ([patch[@"applicationIdentifier"] isEqual: @"com.flex.systemwide"]) executable = @"com.apple.UIKit";
-        else executable = patch[@"appIdentifier"];
+        NSString *executable = patch[@"appIdentifier"];
+        if ([executable isEqual: @"com.flex.systemwide"]) executable = @"com.apple.UIKit";
         NSDictionary *plist = @{@"Filter": @{@"Bundles": executable}};
         NSString *plistPath = [NSString stringWithFormat:@"%@/%@.plist", sandbox, title];
         [plist writeToFile:plistPath atomically:YES];
@@ -139,7 +147,7 @@ int main (int argc, char **argv) {
         printf("Project %s created in %s\n", title.UTF8String, sandbox.UTF8String);
     } else { // Close tweak if statement
         printf("\n\n%s", xm.UTF8String);
-        freopen([@"/dev/null" cStringUsingEncoding:NSASCIIStringEncoding], "a+", stderr);
+        freopen([@"/dev/null" cStringUsingEncoding:NSASCIIStringEncoding], "a+", stderr); 
         [UIPasteboard.generalPasteboard setString:xm];
         printf("Output has been successfully copied to your clipboard. You can now easily paste this output in your .xm file\n");
         if (uikit) printf("\nPlease add UIKit to your project's FRAMEWORKS because this tweak includes color specifying\n");
