@@ -1,4 +1,4 @@
-#import <Foundation/Foundation.h>
+@import Foundation;
 
 int main (int argc, char **argv) {
     
@@ -47,17 +47,14 @@ int main (int argc, char **argv) {
                 break;
         }
     
-    // Handles the annoying issue of switching plists when testing on iOS vs developing with Xcode
     NSDictionary *file;
-    if (getPlist) { 
-    // Thanks: https://stackoverflow.com/a/16249252
-    NSString *plistDataString = [NSString stringWithContentsOfURL:[NSURL URLWithString:@"https://ipadkid358.github.io/ftt/patches.plist"] encoding:NSUTF8StringEncoding error:nil];
-	NSData* plistData = [plistDataString dataUsingEncoding:NSUTF8StringEncoding];
-NSPropertyListFormat format;
-	file = [NSPropertyListSerialization propertyListFromData:plistData mutabilityOption:NSPropertyListImmutable format:&format errorDescription:NULL];
+    if (getPlist) {
+        NSString *plistDataString = [NSString stringWithContentsOfURL:[NSURL URLWithString:@"https://ipadkid358.github.io/ftt/patches.plist"] encoding:NSUTF8StringEncoding error:nil];
+        NSData* plistData = [plistDataString dataUsingEncoding:NSUTF8StringEncoding];
+        NSPropertyListFormat format;
+        file = [NSPropertyListSerialization propertyListWithData:plistData options:NSPropertyListImmutable format:&format error:NULL];
     }
     else if ([NSFileManager.defaultManager fileExistsAtPath:@"/var/mobile/Library/Application Support/Flex3/patches.plist"]) file = [[NSDictionary alloc] initWithContentsOfFile:@"/var/mobile/Library/Application Support/Flex3/patches.plist"];
-    else if ([NSFileManager.defaultManager fileExistsAtPath:@"/Users/ipad_kid/Downloads/patches.plist"]) file = [[NSDictionary alloc] initWithContentsOfFile:@"/Users/ipad_kid/Downloads/patches.plist"];
     else {
         printf("File not found, please ensure Flex 3 is installed (if you're using an older version of Flex, please contact me at https://ipadkid358.github.io/contact.html)");
         exit(-1);
@@ -95,7 +92,7 @@ NSPropertyListFormat format;
         NSArray *allOverrides = top[@"overrides"];
         for (NSDictionary *override in allOverrides) {
             NSString *origValue = override[@"value"][@"value"];
-            if ([origValue isKindOfClass:[NSString class]] && [[origValue substringToIndex:8] isEqual:@"(FLNULL)"]) origValue = @"nil";
+            if ([origValue isKindOfClass:NSString.class] && [[origValue substringToIndex:8] isEqual:@"(FLNULL)"]) origValue = @"nil";
             else if ([origValue isKindOfClass:[NSString class]] && [[origValue substringToIndex:8] isEqual:@"FLcolor:"]) {
                 NSArray *color = [[origValue substringFromIndex:8] componentsSeparatedByString:@","];
                 origValue = [NSString stringWithFormat:@"[UIColor colorWithRed:%@.0/255.0 green:%@.0/255.0 blue:%@.0/255.0 alpha:%@.0/255.0]", color[0], color[1], color[2], color[3]];
@@ -114,7 +111,7 @@ NSPropertyListFormat format;
             NSString *smartComment = top[@"name"];
             NSString *defaultComment = [NSString stringWithFormat:@"Unit for %@", top[@"methodObjc"][@"displayName"]];
             if (smartComment.length > 0 && !([smartComment isEqual:defaultComment])) [xm appendString:[NSString stringWithFormat:@"	// %@\n", smartComment]];
-        } // Close smart if statement  
+        } // Close smart if statement
         [xm appendString:[NSString stringWithFormat:@"} \n%%end\n\n"]];
     } // Closing top for loop
     
@@ -147,11 +144,13 @@ NSPropertyListFormat format;
         printf("Project %s created in %s\n", title.UTF8String, sandbox.UTF8String);
     } else { // Close tweak if statement
         printf("\n\n%s", xm.UTF8String);
-        freopen([@"/dev/null" cStringUsingEncoding:NSASCIIStringEncoding], "a+", stderr); 
-        [UIPasteboard.generalPasteboard setString:xm];
+        freopen([@"/dev/null" cStringUsingEncoding:NSASCIIStringEncoding], "a+", stderr);
+        #if TARGET_OS_IPHONE // UIKit apparently isn't a thing on MacOS, so this allows us to compile with Xcode
+            [UIPasteboard.generalPasteboard setString:xm];
+        #endif
         printf("Output has been successfully copied to your clipboard. You can now easily paste this output in your .xm file\n");
         if (uikit) printf("\nPlease add UIKit to your project's FRAMEWORKS because this tweak includes color specifying\n");
         printf("\n");
-    } // Close tweak else statement 
+    } // Close tweak else statement
     return 0;
 } // Closing main
