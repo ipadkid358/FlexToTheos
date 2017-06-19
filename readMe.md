@@ -5,7 +5,8 @@ Enter a number and get a Theos project. Fairly straight forward CLI
 TODOs: 
  - Support for Swift classes 
 
-Compile: ```bash
+Compile:
+```bash
 git clone https://github.com/ipadkid358/FlexToTheos.git
 cd FlexToTheos
 make
