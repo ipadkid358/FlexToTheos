@@ -5,7 +5,12 @@ Enter a number and get a Theos project. Fairly straight forward CLI
 TODOs: 
  - Support for Swift classes 
 
-Compile: `make; cp .theos/obj/debug/ftt .`
+Compile: ```bash
+git clone https://github.com/ipadkid358/FlexToTheos.git
+cd FlexToTheos
+make
+mv .theos/obj/debug/ftt .
+```
 
 [Direct binary download](https://ipadkid358.github.io/scripts/ftt) (may not be latest from source) 
 
@@ -34,5 +39,5 @@ make
 test -f .theos/obj/debug/ftt && mv .theos/obj/debug/ftt .
 rm -r .theos
 rm -r obj
-test -f ftt && ./ftt 
+test -f ftt && ./ftt
 ```

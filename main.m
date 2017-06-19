@@ -131,7 +131,7 @@ int main (int argc, char **argv) {
         // plist handling
         NSString *executable = patch[@"appIdentifier"];
         if ([executable isEqual: @"com.flex.systemwide"]) executable = @"com.apple.UIKit";
-        NSDictionary *plist = @{@"Filter": @{@"Bundles": executable}};
+        NSDictionary *plist = @{@"Filter": @{@"Bundles": @[executable]}};
         NSString *plistPath = [NSString stringWithFormat:@"%@/%@.plist", sandbox, title];
         [plist writeToFile:plistPath atomically:YES];
         
@@ -144,10 +144,11 @@ int main (int argc, char **argv) {
         printf("Project %s created in %s\n", title.UTF8String, sandbox.UTF8String);
     } else { // Close tweak if statement
         printf("\n\n%s", xm.UTF8String);
-        freopen([@"/dev/null" cStringUsingEncoding:NSASCIIStringEncoding], "a+", stderr);
-        #if TARGET_OS_IPHONE // UIKit apparently isn't a thing on MacOS, so this allows us to compile with Xcode
-            [UIPasteboard.generalPasteboard setString:xm];
-        #endif
+        freopen("/dev/null", "w", stderr);
+#if TARGET_OS_IPHONE // UIKit apparently isn't a thing on MacOS, so this allows us to compile with Xcode
+        [UIPasteboard.generalPasteboard setString:xm];
+#endif
+        fclose(stderr);
         printf("Output has been successfully copied to your clipboard. You can now easily paste this output in your .xm file\n");
         if (uikit) printf("\nPlease add UIKit to your project's FRAMEWORKS because this tweak includes color specifying\n");
         printf("\n");
