@@ -93,11 +93,14 @@ int main (int argc, char **argv) {
         NSArray *allOverrides = top[@"overrides"];
         for (NSDictionary *override in allOverrides) {
             NSString *origValue = override[@"value"][@"value"];
-            if ([origValue isKindOfClass:NSString.class] && [[origValue substringToIndex:8] isEqual:@"(FLNULL)"]) origValue = @"nil";
-            else if ([origValue isKindOfClass:[NSString class]] && [[origValue substringToIndex:8] isEqual:@"FLcolor:"]) {
-                NSArray *color = [[origValue substringFromIndex:8] componentsSeparatedByString:@","];
-                origValue = [NSString stringWithFormat:@"[UIColor colorWithRed:%@.0/255.0 green:%@.0/255.0 blue:%@.0/255.0 alpha:%@.0/255.0]", color[0], color[1], color[2], color[3]];
-                uikit = YES;
+            if ([origValue isKindOfClass:NSString.class] && origValue.length >= 8) {
+                NSString *firstEight = [origValue substringToIndex:8];
+                if ([firstEight isEqual:@"(FLNULL)"]) origValue = @"nil";
+                else if ([firstEight isEqual:@"FLcolor:"]) {
+                    NSArray *color = [[origValue substringFromIndex:8] componentsSeparatedByString:@","];
+                    origValue = [NSString stringWithFormat:@"[UIColor colorWithRed:%@.0/255.0 green:%@.0/255.0 blue:%@.0/255.0 alpha:%@.0/255.0]", color[0], color[1], color[2], color[3]];
+                    uikit = YES;
+                }
             }
             int argument = [override[@"argument"] intValue];
             if (argument == 0) [xm appendString:[NSString stringWithFormat:@"	return %@; \n", origValue]];
