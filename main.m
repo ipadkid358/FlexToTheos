@@ -81,12 +81,12 @@ int main (int argc, char **argv) {
         NSDictionary *units = top[@"methodObjc"];
         
         // Class name handling
-        [xm appendString:[NSString stringWithFormat:@"%%hook %@\n", units[@"className"]]];
+        [xm appendFormat:@"%%hook %@\n", units[@"className"]];
         
         // Method name handling
         NSArray *displayName = [units[@"displayName"] componentsSeparatedByString:@")"];
-        [xm appendString:[NSString stringWithFormat:@"%@)%@", displayName[0], displayName[1]]];
-        for (int methodBreak = 2; methodBreak < [displayName count]; methodBreak++) [xm appendString:[NSString stringWithFormat:@")arg%i%@", methodBreak-1, displayName[methodBreak]]];
+        [xm appendFormat:@"%@)%@", displayName[0], displayName[1]];
+        for (int methodBreak = 2; methodBreak < [displayName count]; methodBreak++) [xm appendFormat:@")arg%i%@", methodBreak-1, displayName[methodBreak]];
         [xm appendString:@" { \n"];
         
         // Argument handling
@@ -103,20 +103,20 @@ int main (int argc, char **argv) {
                 }
             }
             int argument = [override[@"argument"] intValue];
-            if (argument == 0) [xm appendString:[NSString stringWithFormat:@"	return %@; \n", origValue]];
-            else [xm appendString:[NSString stringWithFormat:@"	arg%i = %@;\n", argument, origValue]];
+            if (argument == 0) [xm appendFormat:@"	return %@; \n", origValue];
+            else [xm appendFormat:@"	arg%i = %@;\n", argument, origValue];
         } // Closing arguments for loop
         
-        if ([allOverrides count] == 0 || [allOverrides[0][@"argument"] intValue] > 0) {
-            if ([displayName[0] isEqual:@"-(void"]) [xm appendString:[NSString stringWithFormat:@"	%%orig;\n"]];
-            else [xm appendString:[NSString stringWithFormat:@"	return %%orig;\n"]];
+        if (allOverrides.count == 0 || [allOverrides[0][@"argument"] intValue] > 0) {
+            if ([displayName[0] isEqual:@"-(void"]) [xm appendFormat:@"	%%orig;\n"];
+            else [xm appendFormat:@"	return %%orig;\n"];
         } // Closing not zero if statement
         if (smart) {
             NSString *smartComment = top[@"name"];
             NSString *defaultComment = [NSString stringWithFormat:@"Unit for %@", top[@"methodObjc"][@"displayName"]];
-            if (smartComment.length > 0 && !([smartComment isEqual:defaultComment])) [xm appendString:[NSString stringWithFormat:@"	// %@\n", smartComment]];
+            if (smartComment.length > 0 && !([smartComment isEqual:defaultComment])) [xm appendFormat:@"	// %@\n", smartComment];
         } // Close smart if statement
-        [xm appendString:[NSString stringWithFormat:@"} \n%%end\n\n"]];
+        [xm appendFormat:@"} \n%%end\n\n"];
     } // Closing top for loop
     
     if (tweak) {
@@ -125,10 +125,10 @@ int main (int argc, char **argv) {
         
         // Makefile handling
         if ([name isEqual:@"by ipad_kid and open source on GitHub (ipadkid358/FlexToTheos)"]) name = patch[@"name"];
-        NSString *title = [[name componentsSeparatedByCharactersInSet:[[NSCharacterSet alphanumericCharacterSet] invertedSet]] componentsJoinedByString:@""];
-        NSMutableString *makefile = [NSMutableString new];
-        [makefile appendString:[NSString stringWithFormat:@"include $(THEOS)/makefiles/common.mk\n\nTWEAK_NAME = %@\n%@_FILES = Tweak.xm\n", title, title]];
-        if (uikit) [makefile appendString:[NSString stringWithFormat:@"%@_FRAMEWORKS = UIKit\n", title]];
+        NSString *title = [[name componentsSeparatedByCharactersInSet:NSCharacterSet.alphanumericCharacterSet.invertedSet] componentsJoinedByString:@""];
+        NSMutableString *makefile = NSMutableString.new;
+        [makefile appendFormat:@"include $(THEOS)/makefiles/common.mk\n\nTWEAK_NAME = %@\n%@_FILES = Tweak.xm\n", title, title];
+        if (uikit) [makefile appendFormat:@"%@_FRAMEWORKS = UIKit\n", title];
         [makefile appendString:@"\ninclude $(THEOS_MAKE_PATH)/tweak.mk"];
         [makefile writeToFile:[NSString stringWithFormat:@"%@/Makefile", sandbox] atomically:YES encoding:NSUTF8StringEncoding error:NULL];
         
@@ -141,10 +141,11 @@ int main (int argc, char **argv) {
         
         // Control file handling
         NSString *author = patch[@"author"];
-        NSString *authorChar = [[author componentsSeparatedByCharactersInSet:[[NSCharacterSet alphanumericCharacterSet] invertedSet]] componentsJoinedByString:@""];
+        NSString *authorChar = [[author componentsSeparatedByCharactersInSet:NSCharacterSet.alphanumericCharacterSet.invertedSet] componentsJoinedByString:@""];
         NSString *description = [patch[@"cloudDescription"] stringByReplacingOccurrencesOfString:@"\n" withString:@"\n "];
         NSString *control = [NSString stringWithFormat:@"Package: com.%@.%@\nName: %@\nAuthor: %@\nDescription: %@\nDepends: mobilesubstrate\nMaintainer: ipad_kid <ipadkid358@gmail.com>\nArchitecture: iphoneos-arm\nSection: Tweaks\nVersion: %@\n", authorChar, title, name, author, description, version];
         [control writeToFile:[NSString stringWithFormat:@"%@/control", sandbox] atomically:YES encoding:NSUTF8StringEncoding error:NULL];
+        
         [xm writeToFile:[NSString stringWithFormat:@"%@/Tweak.xm", sandbox] atomically:YES encoding:NSUTF8StringEncoding error:NULL];
         printf("Project %s created in %s\n", title.UTF8String, sandbox.UTF8String);
     } else { // Close tweak if statement
