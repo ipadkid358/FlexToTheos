@@ -56,7 +56,7 @@ int main (int argc, char **argv) {
     }
     
     NSArray *allPatches = file[@"patches"];
-    NSUInteger allPatchesCount = allPatches.count;
+    unsigned long allPatchesCount = allPatches.count;
     if (choice == -1) {
         for (int choose = 0; choose < allPatchesCount; choose++) {
             printf("  %i: ", choose);
@@ -145,7 +145,7 @@ int main (int argc, char **argv) {
         NSString *description = [patch[@"cloudDescription"] stringByReplacingOccurrencesOfString:@"\n" withString:@"\n "];
         NSString *control = [NSString stringWithFormat:@"Package: com.%@.%@\nName: %@\nAuthor: %@\nDescription: %@\nDepends: mobilesubstrate\nMaintainer: ipad_kid <ipadkid358@gmail.com>\nArchitecture: iphoneos-arm\nSection: Tweaks\nVersion: %@\n", authorChar, title, name, author, description, version];
         [control writeToFile:[NSString stringWithFormat:@"%@/control", sandbox] atomically:YES encoding:NSUTF8StringEncoding error:NULL];
-        
+
         [xm writeToFile:[NSString stringWithFormat:@"%@/Tweak.xm", sandbox] atomically:YES encoding:NSUTF8StringEncoding error:NULL];
         printf("Project %s created in %s\n", title.UTF8String, sandbox.UTF8String);
     } else { // Close tweak if statement
