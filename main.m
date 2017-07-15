@@ -11,7 +11,7 @@ int main (int argc, char **argv) {
     BOOL smart = NO;
     BOOL getPlist = NO;
     int c;
-    while ((c = getopt (argc, argv, "f:n:v:p:dtsg")) != -1)
+    while ((c = getopt(argc, argv, ":f:n:v:p:dtsg")) != -1)
         switch(c) {
             case 'f':
                 sandbox = [NSString stringWithFormat:@"%s", optarg];
@@ -48,22 +48,19 @@ int main (int argc, char **argv) {
         }
     
     NSDictionary *file;
-    if (getPlist) {
-        NSString *plistDataString = [NSString stringWithContentsOfURL:[NSURL URLWithString:@"https://ipadkid358.github.io/ftt/patches.plist"] encoding:NSUTF8StringEncoding error:nil];
-        NSData* plistData = [plistDataString dataUsingEncoding:NSUTF8StringEncoding];
-        NSPropertyListFormat format;
-        file = [NSPropertyListSerialization propertyListWithData:plistData options:NSPropertyListImmutable format:&format error:NULL];
-    }
+    if (getPlist) file = [NSDictionary dictionaryWithContentsOfURL:[NSURL URLWithString:@"https://ipadkid358.github.io/ftt/patches.plist"]];
     else if ([NSFileManager.defaultManager fileExistsAtPath:@"/var/mobile/Library/Application Support/Flex3/patches.plist"]) file = [[NSDictionary alloc] initWithContentsOfFile:@"/var/mobile/Library/Application Support/Flex3/patches.plist"];
     else {
         printf("File not found, please ensure Flex 3 is installed (if you're using an older version of Flex, please contact me at https://ipadkid358.github.io/contact.html)");
         exit(-1);
     }
     
+    NSArray *allPatches = file[@"patches"];
+    NSUInteger allPatchesCount = allPatches.count;
     if (choice == -1) {
-        for (int choose = 0; choose < [file[@"patches"] count]; choose++) {
+        for (int choose = 0; choose < allPatchesCount; choose++) {
             printf("  %i: ", choose);
-            printf("%s\n", [file[@"patches"][choose][@"name"] UTF8String]);
+            printf("%s\n", [allPatches[choose][@"name"] UTF8String]);
         } // Close choose for loop
         
         if (dump) exit(0);
@@ -71,7 +68,11 @@ int main (int argc, char **argv) {
         scanf("%i", &choice);
     } // Close choice if statement
     
-    NSDictionary *patch = file[@"patches"][choice];
+    if (allPatchesCount <= choice) {
+        printf("Please input a valid number between 0 and %lu\n", allPatchesCount);
+        exit(-1);
+    }
+    NSDictionary *patch = allPatches[choice];
     
     BOOL uikit = NO;
     // Tweak.xm handling
@@ -136,9 +137,10 @@ int main (int argc, char **argv) {
         [plist writeToFile:plistPath atomically:YES];
         
         // Control file handling
-        NSString *author = [[patch[@"author"] componentsSeparatedByCharactersInSet:[[NSCharacterSet alphanumericCharacterSet] invertedSet]] componentsJoinedByString:@""];
+        NSString *author = patch[@"author"];
+        NSString *authorChar = [[author componentsSeparatedByCharactersInSet:[[NSCharacterSet alphanumericCharacterSet] invertedSet]] componentsJoinedByString:@""];
         NSString *description = [patch[@"cloudDescription"] stringByReplacingOccurrencesOfString:@"\n" withString:@"\n "];
-        NSString *control = [NSString stringWithFormat:@"Package: com.%@.%@\nName: %@\nAuthor: %@\nDescription: %@\nDepends: mobilesubstrate\nMaintainer: ipad_kid <ipadkid358@gmail.com>\nArchitecture: iphoneos-arm\nSection: Tweaks\nVersion: %@\n", author, title, name, author, description, version];
+        NSString *control = [NSString stringWithFormat:@"Package: com.%@.%@\nName: %@\nAuthor: %@\nDescription: %@\nDepends: mobilesubstrate\nMaintainer: ipad_kid <ipadkid358@gmail.com>\nArchitecture: iphoneos-arm\nSection: Tweaks\nVersion: %@\n", authorChar, title, name, author, description, version];
         [control writeToFile:[NSString stringWithFormat:@"%@/control", sandbox] atomically:YES encoding:NSUTF8StringEncoding error:NULL];
         [xm writeToFile:[NSString stringWithFormat:@"%@/Tweak.xm", sandbox] atomically:YES encoding:NSUTF8StringEncoding error:NULL];
         printf("Project %s created in %s\n", title.UTF8String, sandbox.UTF8String);
