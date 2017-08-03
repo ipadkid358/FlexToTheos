@@ -17,28 +17,20 @@ mv .theos/obj/debug/ftt .
 
 ```
 Usage: ./ftt [OPTIONS]
-    Options: 
-	-f	Set name of folder created for project (default is "Sandbox")
-	-n	Override the tweak name
-	-v	Set version (default is  0.0.1)
-	-p	Directly plug in number (usually for consecutive dumps)
-	-d	Only print available patches, don't do anything (cannot be used with any other options)
-	-t	Only print Tweak.xm to console (can only be used with -p)
-	-s	Enable smart comments (beta option)
+   Options:
+      -f    Set name of folder created for project (default is Sandbox)
+      -n    Override the tweak name
+      -v    Set version (default is  0.0.1)
+      -p    Directly plug in number
+      -c    Get patches directly from the cloud. Downloads use your Flex downloads.
+              Free accounts still have limits. Patch IDs are the last digits in share links
+      -d    Only print available patches, don't do anything (cannot be used with any other options)
+      -t    Only print Tweak.xm to console
+      -s    Enable smart comments
+      -o    Disable output, except errors
+      -b    Disable colors in output
 ```
 ex. `./ftt -f MyFolder -n tweak -v 1.0` 
 
 ex. `./ftt -tsp2`
 
-My "Command-B" file: 
-
-(I have a file called `b` with the contents below, and just type `./b` when I'm in the project for quick run and testing)
-
-```bash
-test -f ftt && rm ftt 
-make
-test -f .theos/obj/debug/ftt && mv .theos/obj/debug/ftt .
-rm -r .theos
-rm -r obj
-test -f ftt && ./ftt
-```

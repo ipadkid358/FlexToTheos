@@ -1,4 +1,10 @@
+#if TARGET_OS_IPHONE
+@interface UIDevice (PrivateBlackJacket)
+- (NSString *)_deviceInfoForKey:(NSString *)key;
+@end
+#else
 @import Foundation;
+#endif
 
 int main (int argc, char **argv) {
     
@@ -6,13 +12,19 @@ int main (int argc, char **argv) {
     NSString *version = @"0.0.1";
     NSString *sandbox = @"Sandbox";
     NSString *name = @"by ipad_kid and open source on GitHub (ipadkid358/FlexToTheos)";
+    char *patchID = nil;
     BOOL dump = NO;
     BOOL tweak = YES;
     BOOL smart = NO;
+    BOOL output = YES;
+    BOOL color = YES;
     BOOL getPlist = NO;
     int c;
-    while ((c = getopt(argc, argv, ":f:n:v:p:dtsg")) != -1)
+    while ((c = getopt(argc, argv, ":c:f:n:v:p:dtsbog")) != -1)
         switch(c) {
+            case 'c':
+                patchID = optarg;
+                break;
             case 'f':
                 sandbox = [NSString stringWithFormat:@"%s", optarg];
                 if ([sandbox componentsSeparatedByString:@" "].count > 1) {
@@ -38,45 +50,115 @@ int main (int argc, char **argv) {
             case 's':
                 smart = YES;
                 break;
+            case 'o':
+                output = NO;
+                break;
+            case 'b':
+                color = NO;
+                break;
             case 'g':
                 getPlist = YES;
                 break;
             case '?':
-                printf("\n  Usage: %s [OPTIONS]\n   Options:\n	-f	Set name of folder created for project (default is %s)\n	-n	Override the tweak name\n	-v	Set version (default is  %s)\n	-p	Directly plug in number (usually for consecutive dumps)\n	-d	Only print available patches, don't do anything (cannot be used with any other options)\n	-t	Only print Tweak.xm to console\n	-s	Enable smart comments (beta option)\n\n", argv[0], sandbox.UTF8String, version.UTF8String);
+                printf("\n  Usage: %s [OPTIONS]\n   Options:\n", argv[0]);
+                printf("      -f    Set name of folder created for project (default is %s)\n", sandbox.UTF8String);
+                printf("      -n    Override the tweak name\n");
+                printf("      -v    Set version (default is  %s)\n", version.UTF8String);
+                printf("      -p    Directly plug in number\n");
+                printf("      -c    Get patches directly from the cloud. Downloads use your Flex downloads.\n");
+                printf("              Free accounts still have limits. Patch IDs are the last digits in share links\n");
+                printf("      -d    Only print available patches, don't do anything (cannot be used with any other options)\n");
+                printf("      -t    Only print Tweak.xm to console\n");
+                printf("      -s    Enable smart comments\n");
+                printf("      -o    Disable output, except errors\n");
+                printf("      -b    Disable colors in output\n");
+                printf("\n");
                 exit(-1);
                 break;
         }
-    
-    NSDictionary *file;
-    if (getPlist) file = [NSDictionary dictionaryWithContentsOfURL:[NSURL URLWithString:@"https://ipadkid358.github.io/ftt/patches.plist"]];
-    else if ([NSFileManager.defaultManager fileExistsAtPath:@"/var/mobile/Library/Application Support/Flex3/patches.plist"]) file = [[NSDictionary alloc] initWithContentsOfFile:@"/var/mobile/Library/Application Support/Flex3/patches.plist"];
-    else {
-        printf("File not found, please ensure Flex 3 is installed (if you're using an older version of Flex, please contact me at https://ipadkid358.github.io/contact.html)");
-        exit(-1);
-    }
-    
-    NSArray *allPatches = file[@"patches"];
-    unsigned long allPatchesCount = allPatches.count;
-    if (choice == -1) {
-        for (int choose = 0; choose < allPatchesCount; choose++) {
-            printf("  %i: ", choose);
-            printf("%s\n", [allPatches[choose][@"name"] UTF8String]);
-        } // Close choose for loop
+    if (!output) color = NO;
+    NSFileManager *fileManager = NSFileManager.defaultManager;
+    NSDictionary *patch;
+    NSString *titleKey;
+    NSString *appBundleKey;
+    NSString *descriptionKey;
+    if (patchID) {
+        // because UIKit isn't a thing on MacOS, this allows us to compile with Xcode
+        NSString *deviceID;
+#if TARGET_OS_IPHONE
+        deviceID = [UIDevice.currentDevice _deviceInfoForKey:@"UniqueDeviceID"];
+#endif
+        NSDictionary *flexPrefs = [[NSDictionary alloc] initWithContentsOfFile:@"/var/mobile/Library/Preferences/com.johncoates.Flex.plist"];
+        NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:@"https://api2.getflex.co/patch/download"]];
+        [req setHTTPMethod:@"POST"];
+        [req setHTTPBody:[[NSString stringWithFormat:@"{\"patchID\": %s, \"deviceID\":\"%@\", \"sessionID\":\"%@\" }", patchID, deviceID, flexPrefs[@"session"]] dataUsingEncoding:NSASCIIStringEncoding allowLossyConversion:NO]]; // If there's a better way to do this, *please* make a PR, this doesn't feel good
+        if (color) printf("\x1B[36m");
+        if (output) printf("Getting patch %s from Flex servers\n", patchID);
+        if (color) printf("\x1B[0m");
+        __block NSDictionary *getPatch = nil;
+        __block CFRunLoopRef runLoop = CFRunLoopGetCurrent();
+        NSURLSessionDataTask *task = [NSURLSession.sharedSession dataTaskWithRequest:req completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+            if (data == nil || error != nil) {
+                printf("Error getting patch\n");
+                if (error) NSLog(@"%@", error);
+                exit(-1);
+            }
+            getPatch = [NSJSONSerialization JSONObjectWithData:data options:0 error:NULL];
+            if (!getPatch) {
+                printf("Error getting patch\n");
+                NSLog(@"%@", [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding]);
+                exit(-1);
+            }
+            if (!getPatch[@"units"]) {
+                printf("Error getting patch\n");
+                NSLog(@"%@", getPatch);
+                exit(-1);
+            }
+            CFRunLoopStop(runLoop);
+        }];
+        [task resume];
+        CFRunLoopRun();
+        patch = getPatch;
+        titleKey = @"title";
+        appBundleKey = @"applicationIdentifier";
+        descriptionKey = @"description";
+    } else {
+        NSDictionary *file;
+        NSString *firstPath = @"/var/mobile/Library/Application Support/Flex3/patches.plist";
+        NSString *secondPath = @"/var/mobile/Library/UserConfigurationProfiles/PublicInfo/Flex3Patches.plist";
+        if (getPlist) file = [NSDictionary dictionaryWithContentsOfURL:[NSURL URLWithString:@"https://ipadkid358.github.io/ftt/patches.plist"]];
+        else if ([fileManager fileExistsAtPath:firstPath]) file = [[NSDictionary alloc] initWithContentsOfFile:firstPath];
+        else if ([fileManager fileExistsAtPath:secondPath]) file = [[NSDictionary alloc] initWithContentsOfFile:secondPath];
+        else {
+            printf("File not found, please ensure Flex 3 is installed (if you're using an older version of Flex, please contact me at https://ipadkid358.github.io/contact.html)");
+            exit(-1);
+        }
         
-        if (dump) exit(0);
-        printf("Enter corresponding number: ");
-        scanf("%i", &choice);
-    } // Close choice if statement
-    
-    if (allPatchesCount <= choice) {
-        printf("Please input a valid number between 0 and %lu\n", allPatchesCount);
-        exit(-1);
+        NSArray *allPatches = file[@"patches"];
+        unsigned long allPatchesCount = allPatches.count;
+        if (choice == -1) {
+            for (int choose = 0; choose < allPatchesCount; choose++) {
+                printf("  %i: ", choose);
+                printf("%s\n", [allPatches[choose][@"name"] UTF8String]);
+            } // Close choose for loop
+            
+            if (dump) exit(0);
+            printf("Enter corresponding number: ");
+            scanf("%i", &choice);
+        } // Close choice if statement
+        
+        if (allPatchesCount <= choice) {
+            printf("Please input a valid number between 0 and %lu\n", allPatchesCount);
+            exit(-1);
+        }
+        patch = allPatches[choice];
+        titleKey = @"name";
+        appBundleKey = @"appIdentifier";
+        descriptionKey = @"cloudDescription";
     }
-    NSDictionary *patch = allPatches[choice];
-    
     BOOL uikit = NO;
     // Tweak.xm handling
-    NSMutableString *xm = [NSMutableString new];
+    NSMutableString *xm = NSMutableString.new;
     for (NSDictionary *top in patch[@"units"]) {
         NSDictionary *units = top[@"methodObjc"];
         
@@ -86,7 +168,7 @@ int main (int argc, char **argv) {
         // Method name handling
         NSArray *displayName = [units[@"displayName"] componentsSeparatedByString:@")"];
         [xm appendFormat:@"%@)%@", displayName[0], displayName[1]];
-        for (int methodBreak = 2; methodBreak < [displayName count]; methodBreak++) [xm appendFormat:@")arg%i%@", methodBreak-1, displayName[methodBreak]];
+        for (int methodBreak = 2; methodBreak < displayName.count; methodBreak++) [xm appendFormat:@")arg%i%@", methodBreak-1, displayName[methodBreak]];
         [xm appendString:@" { \n"];
         
         // Argument handling
@@ -102,28 +184,28 @@ int main (int argc, char **argv) {
                 } else origValue = [NSString stringWithFormat:@"@\"%@\"", origValue];
             }
             int argument = [override[@"argument"] intValue];
-            if (argument == 0) [xm appendFormat:@"	return %@; \n", origValue];
-            else [xm appendFormat:@"	arg%i = %@;\n", argument, origValue];
-        } // Closing arguments for loop
+            if (argument == 0) [xm appendFormat:@"    return %@; \n", origValue];
+            else [xm appendFormat:@"    arg%i = %@;\n", argument, origValue];
+        }
         
         if (allOverrides.count == 0 || [allOverrides[0][@"argument"] intValue] > 0) {
-            if ([displayName[0] isEqual:@"-(void"]) [xm appendFormat:@"	%%orig;\n"];
-            else [xm appendFormat:@"	return %%orig;\n"];
-        } // Closing not zero if statement
+            if ([displayName[0] isEqual:@"-(void"]) [xm appendFormat:@"    %%orig;\n"];
+            else [xm appendFormat:@"    return %%orig;\n"];
+        }
         if (smart) {
             NSString *smartComment = top[@"name"];
             NSString *defaultComment = [NSString stringWithFormat:@"Unit for %@", top[@"methodObjc"][@"displayName"]];
-            if (smartComment.length > 0 && !([smartComment isEqual:defaultComment])) [xm appendFormat:@"	// %@\n", smartComment];
-        } // Close smart if statement
+            if (smartComment.length > 0 && !([smartComment isEqual:defaultComment])) [xm appendFormat:@"    // %@\n", smartComment];
+        }
         [xm appendFormat:@"} \n%%end\n\n"];
-    } // Closing top for loop
+    }
     
     if (tweak) {
         // Creating sandbox
-        [NSFileManager.defaultManager createDirectoryAtPath:sandbox withIntermediateDirectories:NO attributes:NULL error:NULL];
+        [fileManager createDirectoryAtPath:sandbox withIntermediateDirectories:NO attributes:NULL error:NULL];
         
         // Makefile handling
-        if ([name isEqual:@"by ipad_kid and open source on GitHub (ipadkid358/FlexToTheos)"]) name = patch[@"name"];
+        if ([name isEqualToString:@"by ipad_kid and open source on GitHub (ipadkid358/FlexToTheos)"]) name = patch[titleKey];
         NSString *title = [[name componentsSeparatedByCharactersInSet:NSCharacterSet.alphanumericCharacterSet.invertedSet] componentsJoinedByString:@""];
         NSMutableString *makefile = NSMutableString.new;
         [makefile appendFormat:@"include $(THEOS)/makefiles/common.mk\n\nTWEAK_NAME = %@\n%@_FILES = Tweak.xm\n", title, title];
@@ -132,7 +214,7 @@ int main (int argc, char **argv) {
         [makefile writeToFile:[NSString stringWithFormat:@"%@/Makefile", sandbox] atomically:YES encoding:NSUTF8StringEncoding error:NULL];
         
         // plist handling
-        NSString *executable = patch[@"appIdentifier"];
+        NSString *executable = patch[appBundleKey];
         if ([executable isEqual: @"com.flex.systemwide"]) executable = @"com.apple.UIKit";
         NSDictionary *plist = @{@"Filter": @{@"Bundles": @[executable]}};
         NSString *plistPath = [NSString stringWithFormat:@"%@/%@.plist", sandbox, title];
@@ -141,12 +223,14 @@ int main (int argc, char **argv) {
         // Control file handling
         NSString *author = patch[@"author"];
         NSString *authorChar = [[author componentsSeparatedByCharactersInSet:NSCharacterSet.alphanumericCharacterSet.invertedSet] componentsJoinedByString:@""];
-        NSString *description = [patch[@"cloudDescription"] stringByReplacingOccurrencesOfString:@"\n" withString:@"\n "];
+        NSString *description = [patch[descriptionKey] stringByReplacingOccurrencesOfString:@"\n" withString:@"\n "];
         NSString *control = [NSString stringWithFormat:@"Package: com.%@.%@\nName: %@\nAuthor: %@\nDescription: %@\nDepends: mobilesubstrate\nMaintainer: ipad_kid <ipadkid358@gmail.com>\nArchitecture: iphoneos-arm\nSection: Tweaks\nVersion: %@\n", authorChar, title, name, author, description, version];
         [control writeToFile:[NSString stringWithFormat:@"%@/control", sandbox] atomically:YES encoding:NSUTF8StringEncoding error:NULL];
-
+        
         [xm writeToFile:[NSString stringWithFormat:@"%@/Tweak.xm", sandbox] atomically:YES encoding:NSUTF8StringEncoding error:NULL];
-        printf("Project %s created in %s\n", title.UTF8String, sandbox.UTF8String);
+        if (color) printf("\x1B[32m");
+        if (output) printf("Project %s created in %s\n", title.UTF8String, sandbox.UTF8String);
+        if (color) printf("\x1B[0m");
     } else { // Close tweak if statement
         printf("\n\n%s", xm.UTF8String);
         freopen("/dev/null", "w", stderr);
@@ -154,9 +238,14 @@ int main (int argc, char **argv) {
         [UIPasteboard.generalPasteboard setString:xm];
 #endif
         fclose(stderr);
-        printf("Output has been successfully copied to your clipboard. You can now easily paste this output in your .xm file\n");
-        if (uikit) printf("\nPlease add UIKit to your project's FRAMEWORKS because this tweak includes color specifying\n");
-        printf("\n");
+        if (color) printf("\x1B[32m");
+        if (output) printf("Output has been successfully copied to your clipboard. You can now easily paste this output in your .xm file\n");
+        if (uikit) {
+            if (color) printf("\x1B[31m");
+            if (output) printf("\nPlease add UIKit to your project's FRAMEWORKS because this tweak includes color specifying\n");
+        }
+        if (color) printf("\x1B[0m");
+        if (output) printf("\n");
     } // Close tweak else statement
     return 0;
 } // Closing main
