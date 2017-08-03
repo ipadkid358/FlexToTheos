@@ -67,7 +67,7 @@ int main (int argc, char **argv) {
                 printf("      -p    Directly plug in number\n");
                 printf("      -c    Get patches directly from the cloud. Downloads use your Flex downloads.\n");
                 printf("              Free accounts still have limits. Patch IDs are the last digits in share links\n");
-                printf("      -d    Only print available patches, don't do anything (cannot be used with any other options)\n");
+                printf("      -d    Only print available local patches, don't do anything (cannot be used with any other options)\n");
                 printf("      -t    Only print Tweak.xm to console\n");
                 printf("      -s    Enable smart comments\n");
                 printf("      -o    Disable output, except errors\n");
@@ -83,8 +83,7 @@ int main (int argc, char **argv) {
     NSString *appBundleKey;
     NSString *descriptionKey;
     if (patchID) {
-        // because UIKit isn't a thing on MacOS, this allows us to compile with Xcode
-        NSString *deviceID;
+        NSString *deviceID; // because UIKit isn't a thing on MacOS, this allows us to compile with Xcode
 #if TARGET_OS_IPHONE
         deviceID = [UIDevice.currentDevice _deviceInfoForKey:@"UniqueDeviceID"];
 #endif
@@ -95,6 +94,7 @@ int main (int argc, char **argv) {
         if (color) printf("\x1B[36m");
         if (output) printf("Getting patch %s from Flex servers\n", patchID);
         if (color) printf("\x1B[0m");
+        
         __block NSDictionary *getPatch = nil;
         __block CFRunLoopRef runLoop = CFRunLoopGetCurrent();
         NSURLSessionDataTask *task = [NSURLSession.sharedSession dataTaskWithRequest:req completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
@@ -140,12 +140,12 @@ int main (int argc, char **argv) {
             for (int choose = 0; choose < allPatchesCount; choose++) {
                 printf("  %i: ", choose);
                 printf("%s\n", [allPatches[choose][@"name"] UTF8String]);
-            } // Close choose for loop
+            }
             
             if (dump) exit(0);
             printf("Enter corresponding number: ");
             scanf("%i", &choice);
-        } // Close choice if statement
+        }
         
         if (allPatchesCount <= choice) {
             printf("Please input a valid number between 0 and %lu\n", allPatchesCount);
@@ -176,8 +176,8 @@ int main (int argc, char **argv) {
         for (NSDictionary *override in allOverrides) {
             NSString *origValue = override[@"value"][@"value"];
             if ([origValue isKindOfClass:NSString.class]) {
-                if (origValue.length >= 8 && [[origValue substringToIndex:8] isEqual:@"(FLNULL)"]) origValue = @"nil";
-                else if (origValue.length >= 8 && [[origValue substringToIndex:8] isEqual:@"FLcolor:"]) {
+                if (origValue.length >= 8 && [[origValue substringToIndex:8] isEqualToString:@"(FLNULL)"]) origValue = @"nil";
+                else if (origValue.length >= 8 && [[origValue substringToIndex:8] isEqualToString:@"FLcolor:"]) {
                     NSArray *color = [[origValue substringFromIndex:8] componentsSeparatedByString:@","];
                     origValue = [NSString stringWithFormat:@"[UIColor colorWithRed:%@.0/255.0 green:%@.0/255.0 blue:%@.0/255.0 alpha:%@.0/255.0]", color[0], color[1], color[2], color[3]];
                     uikit = YES;
@@ -189,33 +189,37 @@ int main (int argc, char **argv) {
         }
         
         if (allOverrides.count == 0 || [allOverrides[0][@"argument"] intValue] > 0) {
-            if ([displayName[0] isEqual:@"-(void"]) [xm appendFormat:@"    %%orig;\n"];
+            if ([displayName[0] isEqualToString:@"-(void"]) [xm appendFormat:@"    %%orig;\n"];
             else [xm appendFormat:@"    return %%orig;\n"];
         }
         if (smart) {
             NSString *smartComment = top[@"name"];
             NSString *defaultComment = [NSString stringWithFormat:@"Unit for %@", top[@"methodObjc"][@"displayName"]];
-            if (smartComment.length > 0 && !([smartComment isEqual:defaultComment])) [xm appendFormat:@"    // %@\n", smartComment];
+            if (smartComment.length > 0 && !([smartComment isEqualToString:defaultComment])) [xm appendFormat:@"    // %@\n", smartComment];
         }
         [xm appendFormat:@"} \n%%end\n\n"];
     }
     
     if (tweak) {
         // Creating sandbox
+        if ([fileManager fileExistsAtPath:sandbox]) {
+            printf("%s already exists\n", sandbox.UTF8String);
+            exit(-1);
+        }
         [fileManager createDirectoryAtPath:sandbox withIntermediateDirectories:NO attributes:NULL error:NULL];
         
         // Makefile handling
         if ([name isEqualToString:@"by ipad_kid and open source on GitHub (ipadkid358/FlexToTheos)"]) name = patch[titleKey];
         NSString *title = [[name componentsSeparatedByCharactersInSet:NSCharacterSet.alphanumericCharacterSet.invertedSet] componentsJoinedByString:@""];
         NSMutableString *makefile = NSMutableString.new;
-        [makefile appendFormat:@"include $(THEOS)/makefiles/common.mk\n\nTWEAK_NAME = %@\n%@_FILES = Tweak.xm\n", title, title];
+        [makefile appendFormat:@"DEBUG=0\ninclude $(THEOS)/makefiles/common.mk\n\nTWEAK_NAME = %@\n%@_FILES = Tweak.xm\n", title, title];
         if (uikit) [makefile appendFormat:@"%@_FRAMEWORKS = UIKit\n", title];
         [makefile appendString:@"\ninclude $(THEOS_MAKE_PATH)/tweak.mk"];
         [makefile writeToFile:[NSString stringWithFormat:@"%@/Makefile", sandbox] atomically:YES encoding:NSUTF8StringEncoding error:NULL];
         
         // plist handling
         NSString *executable = patch[appBundleKey];
-        if ([executable isEqual: @"com.flex.systemwide"]) executable = @"com.apple.UIKit";
+        if ([executable isEqualToString: @"com.flex.systemwide"]) executable = @"com.apple.UIKit";
         NSDictionary *plist = @{@"Filter": @{@"Bundles": @[executable]}};
         NSString *plistPath = [NSString stringWithFormat:@"%@/%@.plist", sandbox, title];
         [plist writeToFile:plistPath atomically:YES];
@@ -231,10 +235,10 @@ int main (int argc, char **argv) {
         if (color) printf("\x1B[32m");
         if (output) printf("Project %s created in %s\n", title.UTF8String, sandbox.UTF8String);
         if (color) printf("\x1B[0m");
-    } else { // Close tweak if statement
+    } else {
         printf("\n\n%s", xm.UTF8String);
         freopen("/dev/null", "w", stderr);
-#if TARGET_OS_IPHONE // UIKit apparently isn't a thing on MacOS, so this allows us to compile with Xcode
+#if TARGET_OS_IPHONE // this allows us to compile with Xcode
         [UIPasteboard.generalPasteboard setString:xm];
 #endif
         fclose(stderr);
@@ -246,6 +250,6 @@ int main (int argc, char **argv) {
         }
         if (color) printf("\x1B[0m");
         if (output) printf("\n");
-    } // Close tweak else statement
+    }
     return 0;
-} // Closing main
+}
