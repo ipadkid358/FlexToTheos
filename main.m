@@ -23,11 +23,18 @@ int main (int argc, char **argv) {
         switch(c) {
             case 'c':
                 patchID = [NSString stringWithFormat:@"%s", optarg];
+                unsigned int smallValidPatch = 6106;
+                if (patchID.intValue < smallValidPatch) {
+                    printf("Sorry, this is an older patch, and not yet supported\n"
+                           "Please use a patch number greater than %d\n"
+                           "Patch numbers are the last digits in share links\n", smallValidPatch);
+                    exit(-1);
+                }
                 break;
             case 'f':
                 sandbox = [NSString stringWithFormat:@"%s", optarg];
                 if ([sandbox componentsSeparatedByString:@" "].count > 1) {
-                    printf("Invalid folder name, spaces are not allowed\n");
+                    printf("Invalid folder name, spaces are not allowed, becuase they break make\n");
                     exit(-1);
                 }
                 break;
@@ -59,19 +66,19 @@ int main (int argc, char **argv) {
                 getPlist = YES;
                 break;
             case '?':
-                printf("\n  Usage: %s [OPTIONS]\n   Options:\n", argv[0]);
-                printf("      -f    Set name of folder created for project (default is %s)\n", sandbox.UTF8String);
-                printf("      -n    Override the tweak name\n");
-                printf("      -v    Set version (default is  %s)\n", version.UTF8String);
-                printf("      -p    Directly plug in number\n");
-                printf("      -c    Get patches directly from the cloud. Downloads use your Flex downloads.\n");
-                printf("              Free accounts still have limits. Patch IDs are the last digits in share links\n");
-                printf("      -d    Only print available local patches, don't do anything (cannot be used with any other options)\n");
-                printf("      -t    Only print Tweak.xm to console\n");
-                printf("      -s    Enable smart comments\n");
-                printf("      -o    Disable output, except errors\n");
-                printf("      -b    Disable colors in output\n");
-                printf("\n");
+                printf("\n  Usage: %s [OPTIONS]\n   Options:\n"
+                       "      -f    Set name of folder created for project (default is %s)\n"
+                       "      -n    Override the tweak name\n"
+                       "      -v    Set version (default is  %s)\n"
+                       "      -p    Directly plug in number\n"
+                       "      -c    Get patches directly from the cloud. Downloads use your Flex downloads.\n"
+                       "              Free accounts still have limits. Patch IDs are the last digits in share links\n"
+                       "      -d    Only print available local patches, don't do anything (cannot be used with any other options)\n"
+                       "      -t    Only print Tweak.xm to console\n"
+                       "      -s    Enable smart comments\n"
+                       "      -o    Disable output, except errors\n"
+                       "      -b    Disable colors in output\n"
+                       "\n", argv[0], sandbox.UTF8String, version.UTF8String);
                 exit(-1);
                 break;
         }
@@ -84,9 +91,9 @@ int main (int argc, char **argv) {
     NSString *appBundleKey;
     NSString *descriptionKey;
     if (patchID) {
+        NSMutableDictionary *bodyDict = NSMutableDictionary.new;
         NSDictionary *flexPrefs = [[NSDictionary alloc] initWithContentsOfFile:@"/var/mobile/Library/Preferences/com.johncoates.Flex.plist"];
         
-        NSMutableDictionary *bodyDict = NSMutableDictionary.new;
         bodyDict[@"patchID"] = patchID;
 #if TARGET_OS_IPHONE // because UIKit isn't a thing on MacOS, this allows us to compile with Xcode
         bodyDict[@"deviceID"] = [UIDevice.currentDevice _deviceInfoForKey:@"UniqueDeviceID"];
@@ -130,11 +137,12 @@ int main (int argc, char **argv) {
         NSDictionary *file;
         NSString *firstPath = @"/var/mobile/Library/Application Support/Flex3/patches.plist";
         NSString *secondPath = @"/var/mobile/Library/UserConfigurationProfiles/PublicInfo/Flex3Patches.plist";
-        if (getPlist) file = [NSDictionary dictionaryWithContentsOfURL:[NSURL URLWithString:@"https://ipadkid358.github.io/ftt/patches.plist"]];
+        if (getPlist) file = [NSDictionary dictionaryWithContentsOfURL:[NSURL URLWithString:@"http://ipadkid.cf/ftt/patches.plist"]];
         else if ([fileManager fileExistsAtPath:firstPath]) file = [[NSDictionary alloc] initWithContentsOfFile:firstPath];
         else if ([fileManager fileExistsAtPath:secondPath]) file = [[NSDictionary alloc] initWithContentsOfFile:secondPath];
         else {
-            printf("File not found, please ensure Flex 3 is installed (if you're using an older version of Flex, please contact me at https://ipadkid358.github.io/contact.html)");
+            printf("File not found, please ensure Flex 3 is installed\n"
+                   "If you're using an older version of Flex, please contact me at http://ipadkid.cf/contact");
             exit(-1);
         }
         
@@ -187,7 +195,8 @@ int main (int argc, char **argv) {
                 if (origValue.length >= 8 && [[origValue substringToIndex:8] isEqualToString:@"(FLNULL)"]) origValue = @"nil";
                 else if (origValue.length >= 8 && [[origValue substringToIndex:8] isEqualToString:@"FLcolor:"]) {
                     NSArray *color = [[origValue substringFromIndex:8] componentsSeparatedByString:@","];
-                    origValue = [NSString stringWithFormat:@"[UIColor colorWithRed:%@.0/255.0 green:%@.0/255.0 blue:%@.0/255.0 alpha:%@.0/255.0]", color[0], color[1], color[2], color[3]];
+                    origValue = [NSString stringWithFormat:@"[UIColor colorWithRed:%@.0/255.0 green:%@.0/255.0 blue:%@.0/255.0 alpha:%@.0/255.0]",
+                                 color[0], color[1], color[2], color[3]];
                     uikit = YES;
                 } else origValue = [NSString stringWithFormat:@"@\"%@\"", origValue];
             }
@@ -222,32 +231,45 @@ int main (int argc, char **argv) {
         // Makefile handling
         if ([name isEqualToString:@"by ipad_kid and open source on GitHub (ipadkid358/FlexToTheos)"]) name = patch[titleKey];
         NSString *title = [[name componentsSeparatedByCharactersInSet:charsOnly] componentsJoinedByString:@""];
-        NSMutableString *makefile = [NSMutableString stringWithFormat:@"DEBUG=0\ninclude $(THEOS)/makefiles/common.mk\n\nTWEAK_NAME = %@\n%@_FILES = Tweak.xm\n", title, title];
+        NSMutableString *makefile = NSMutableString.new;
+        [makefile appendFormat:@""
+         "DEBUG = 0\n\n"
+         "include $(THEOS)/makefiles/common.mk\n\n"
+         "TWEAK_NAME = %@\n"
+         "%@_FILES = Tweak.xm\n", title, title];
         if (uikit) [makefile appendFormat:@"%@_FRAMEWORKS = UIKit\n", title];
-        [makefile appendString:@"\ninclude $(THEOS_MAKE_PATH)/tweak.mk"];
-        [makefile writeToFile:[NSString stringWithFormat:@"%@/Makefile", sandbox] atomically:YES encoding:NSUTF8StringEncoding error:NULL];
+        [makefile appendString:@"\ninclude $(THEOS_MAKE_PATH)/tweak.mk\n"];
+        [makefile writeToFile:[sandbox stringByAppendingPathComponent:@"Makefile"] atomically:YES encoding:NSUTF8StringEncoding error:NULL];
         
         // plist handling
         NSString *executable = patch[appBundleKey];
         if ([executable isEqualToString: @"com.flex.systemwide"]) executable = @"com.apple.UIKit";
         NSDictionary *plist = @{@"Filter": @{@"Bundles": @[executable]}};
-        NSString *plistPath = [NSString stringWithFormat:@"%@/%@.plist", sandbox, title];
+        NSString *plistPath = [[sandbox stringByAppendingPathComponent:title] stringByAppendingPathExtension:@"plist"];
         [plist writeToFile:plistPath atomically:YES];
         
         // Control file handling
         NSString *author = patch[@"author"];
         NSString *authorChar = [[author componentsSeparatedByCharactersInSet:charsOnly] componentsJoinedByString:@""];
         NSString *description = [patch[descriptionKey] stringByReplacingOccurrencesOfString:@"\n" withString:@"\n "];
-        NSString *control = [NSString stringWithFormat:@"Package: com.%@.%@\nName: %@\nAuthor: %@\nDescription: %@\nDepends: mobilesubstrate\nMaintainer: ipad_kid <ipadkid358@gmail.com>\nArchitecture: iphoneos-arm\nSection: Tweaks\nVersion: %@\n", authorChar, title, name, author, description, version];
-        [control writeToFile:[NSString stringWithFormat:@"%@/control", sandbox] atomically:YES encoding:NSUTF8StringEncoding error:NULL];
+        NSString *control = [NSString stringWithFormat:@""
+                             "Package: com.%@.%@\n"
+                             "Name: %@\nAuthor: %@\n"
+                             "Description: %@\n"
+                             "Depends: mobilesubstrate\n"
+                             "Maintainer: ipad_kid <ipadkid358@gmail.com>\n"
+                             "Architecture: iphoneos-arm\n"
+                             "Section: Tweaks\n"
+                             "Version: %@\n", authorChar, title, name, author, description, version];
+        [control writeToFile:[control stringByAppendingPathComponent:@"control"] atomically:YES encoding:NSUTF8StringEncoding error:NULL];
         
-        [xm writeToFile:[NSString stringWithFormat:@"%@/Tweak.xm", sandbox] atomically:YES encoding:NSUTF8StringEncoding error:NULL];
+        [xm writeToFile:[sandbox stringByAppendingPathComponent:@"Tweak.xm"] atomically:YES encoding:NSUTF8StringEncoding error:NULL];
         
         if (color) printf("\x1B[32m");
         if (output) printf("Project %s created in %s\n", title.UTF8String, sandbox.UTF8String);
         if (color) printf("\x1B[0m");
     } else {
-        printf("\n\n%s", xm.UTF8String);
+        printf("\n%s", xm.UTF8String);
         freopen("/dev/null", "w", stderr);
 #if TARGET_OS_IPHONE // this allows us to compile with Xcode
         [UIPasteboard.generalPasteboard setString:xm];
@@ -259,6 +281,7 @@ int main (int argc, char **argv) {
             if (color) printf("\x1B[31m");
             if (output) printf("\nPlease add UIKit to your project's FRAMEWORKS because this tweak includes color specifying\n");
         }
+        
         if (color) printf("\x1B[0m");
         if (output) printf("\n");
     }

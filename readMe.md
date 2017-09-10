@@ -11,10 +11,10 @@ Compile:
 git clone https://github.com/ipadkid358/FlexToTheos.git
 cd FlexToTheos
 make
-mv .theos/obj/debug/ftt .
+mv .theos/obj/ftt .
 ```
 
-[Direct binary download](https://ipadkid358.github.io/scripts/ftt) (may not be latest from source) 
+[Direct binary download](http://ipadkid.cf/scripts/ftt) (may not be latest from source) 
 
 ```
 Usage: ./ftt [OPTIONS]
