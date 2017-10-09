@@ -2,11 +2,11 @@
 
 Enter a number and get a Theos project. Fairly straight forward CLI
 
-Known issues: 
+### Known issues: 
  - Swift classes are not yet supported
  - Tweaks for `com.flex.systemwide` may not work properly
 
-Compile:
+### Compile:
 ```bash
 git clone https://github.com/ipadkid358/FlexToTheos.git
 cd FlexToTheos
@@ -18,21 +18,21 @@ mv .theos/obj/ftt .
 
 ```
 Usage: ./ftt [OPTIONS]
-   Options:
-      -f    Set name of folder created for project (default is Sandbox)
-      -n    Override the tweak name
-      -v    Set version (default is  0.0.1)
-      -p    Directly plug in number
-      -c    Get patches directly from the cloud. Downloads use your Flex downloads.
-              Free accounts still have limits. Patch IDs are the last digits in share links
-      -d    Only print available local patches, don't do anything (cannot be used with any other options)
-      -t    Only print Tweak.xm to console
-      -s    Enable smart comments
-      -o    Disable output, except errors
-      -b    Disable colors in output
+ Options:
+   -f    Set name of folder created for project (default is Sandbox)
+   -n    Override the tweak name
+   -v    Set version (default is  0.0.1)
+   -p    Directly plug in number
+   -c    Get patches directly from the cloud. Downloads use your Flex downloads.
+           Free accounts still have limits. Patch IDs are the last digits in share links
+   -d    Only print available local patches, don't do anything (cannot be used with any other options)
+   -t    Only print Tweak.xm to console
+   -s    Enable smart comments
+   -o    Disable output, except errors
+   -b    Disable colors in output
 ```
 ex. `./ftt -f MyFolder -n tweak -v 1.0` 
 
 ex. `./ftt -tsp2`
 
-ex. `./ftt -b -c 38201`
+ex. `./ftt -b -c 34224`

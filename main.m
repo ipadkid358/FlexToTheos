@@ -1,51 +1,52 @@
-#import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 
 @interface UIDevice (PrivateBlackJacket)
 - (NSString *)_deviceInfoForKey:(NSString *)key;
 @end
 
-int main (int argc, char *argv[]) {
+int main(int argc, char *argv[]) {
     int choice = -1;
     NSString *version = @"0.0.1";
     NSString *sandbox = @"Sandbox";
-    NSString *name = nil;
-    NSString *patchID = nil;
+    NSString *name;
+    NSString *patchID;
     BOOL dump = NO;
     BOOL tweak = YES;
     BOOL smart = NO;
     BOOL output = YES;
     BOOL color = YES;
+    
+    // should be used for testing only
     BOOL getPlist = NO;
     
     int c;
     while ((c = getopt(argc, argv, ":c:f:n:v:p:dtsbog")) != -1)
         switch(c) {
             case 'c':
-                patchID = [NSString stringWithFormat:@"%s", optarg];
+                patchID = [NSString stringWithUTF8String:optarg];
                 unsigned int smallValidPatch = 6106;
                 if (patchID.intValue < smallValidPatch) {
                     printf("Sorry, this is an older patch, and not yet supported\n"
                            "Please use a patch number greater than %d\n"
                            "Patch numbers are the last digits in share links\n", smallValidPatch);
-                    exit(-1);
+                    return 1;
                 }
                 break;
             case 'f':
-                sandbox = [NSString stringWithFormat:@"%s", optarg];
-                if ([sandbox componentsSeparatedByString:@" "].count > 1) {
+                sandbox = [NSString stringWithUTF8String:optarg];
+                if ([[sandbox componentsSeparatedByString:@" "] count] > 1) {
                     printf("Invalid folder name, spaces are not allowed, becuase they break make\n");
-                    exit(-1);
+                    return 1;
                 }
                 break;
             case 'n':
-                name = [NSString stringWithFormat:@"%s", optarg];
+                name = [NSString stringWithUTF8String:optarg];
                 break;
             case 'v':
-                version = [NSString stringWithFormat:@"%s", optarg];
+                version = [NSString stringWithUTF8String:optarg];
                 break;
             case 'p':
-                choice = [NSString stringWithFormat:@"%s", optarg].intValue;
+                choice = [[NSString stringWithUTF8String:optarg] intValue];
                 break;
             case 'd':
                 dump = YES;
@@ -66,20 +67,20 @@ int main (int argc, char *argv[]) {
                 getPlist = YES;
                 break;
             case '?':
-                printf("\n  Usage: %s [OPTIONS]\n   Options:\n"
-                       "      -f    Set name of folder created for project (default is %s)\n"
-                       "      -n    Override the tweak name\n"
-                       "      -v    Set version (default is  %s)\n"
-                       "      -p    Directly plug in number\n"
-                       "      -c    Get patches directly from the cloud. Downloads use your Flex downloads.\n"
-                       "              Free accounts still have limits. Patch IDs are the last digits in share links\n"
-                       "      -d    Only print available local patches, don't do anything (cannot be used with any other options)\n"
-                       "      -t    Only print Tweak.xm to console\n"
-                       "      -s    Enable smart comments\n"
-                       "      -o    Disable output, except errors\n"
-                       "      -b    Disable colors in output\n"
-                       "\n", argv[0], sandbox.UTF8String, version.UTF8String);
-                exit(EXIT_FAILURE);
+                printf("Usage: %s [OPTIONS]\n"
+                       " Options:\n"
+                       "   -f    Set name of folder created for project (default is %s)\n"
+                       "   -n    Override the tweak name\n"
+                       "   -v    Set version (default is  %s)\n"
+                       "   -p    Directly plug in number\n"
+                       "   -c    Get patches directly from the cloud. Downloads use your Flex downloads.\n"
+                       "           Free accounts still have limits. Patch IDs are the last digits in share links\n"
+                       "   -d    Only print available local patches, don't do anything (cannot be used with any other options)\n"
+                       "   -t    Only print Tweak.xm to console\n"
+                       "   -s    Enable smart comments\n"
+                       "   -o    Disable output, except errors\n"
+                       "   -b    Disable colors in output\n", argv[0], sandbox.UTF8String, version.UTF8String);
+                return 1;
                 break;
         }
     
@@ -91,7 +92,7 @@ int main (int argc, char *argv[]) {
     NSString *appBundleKey;
     NSString *descriptionKey;
     if (patchID) {
-        NSDictionary *flexPrefs = [[NSDictionary alloc] initWithContentsOfFile:@"/var/mobile/Library/Preferences/com.johncoates.Flex.plist"];
+        NSDictionary *flexPrefs = [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.johncoates.Flex.plist"];
         NSDictionary *bodyDict = @{
                                    @"patchID":patchID,
                                    @"deviceID":[UIDevice.currentDevice _deviceInfoForKey:@"UniqueDeviceID"],
@@ -99,20 +100,21 @@ int main (int argc, char *argv[]) {
                                    };
         
         NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:@"https://api2.getflex.co/patch/download"]];
-        [req setHTTPMethod:@"POST"];
-        [req setHTTPBody:[NSJSONSerialization dataWithJSONObject:bodyDict options:0 error:NULL]];
+        req.HTTPMethod = @"POST";
+        req.HTTPBody = [NSJSONSerialization dataWithJSONObject:bodyDict options:0 error:NULL];
         
         if (color) printf("\x1B[36m");
         if (output) printf("Getting patch %s from Flex servers\n", patchID.UTF8String);
         if (color) printf("\x1B[0m");
         
-        __block NSDictionary *getPatch = nil;
-        __block CFRunLoopRef runLoop = CFRunLoopGetCurrent();
-        NSURLSessionDataTask *task = [NSURLSession.sharedSession dataTaskWithRequest:req completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+        // due to the runloop and block, the best way to exit after errors is using exit(), although I prefer returning to main to exit
+        CFRunLoopRef runLoop = CFRunLoopGetCurrent();
+        __block NSDictionary *getPatch;
+        [[NSURLSession.sharedSession dataTaskWithRequest:req completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
             if (data == nil || error != nil) {
                 printf("Error getting patch\n");
                 if (error) NSLog(@"%@", error);
-                exit(EXIT_FAILURE);
+                exit(1);
             }
             
             getPatch = [NSJSONSerialization JSONObjectWithData:data options:0 error:NULL];
@@ -120,12 +122,11 @@ int main (int argc, char *argv[]) {
                 printf("Error getting patch\n");
                 if (getPatch) NSLog(@"%@", getPatch);
                 else NSLog(@"%@", [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding]);
-                exit(EXIT_FAILURE);
+                exit(1);
             }
             
             CFRunLoopStop(runLoop);
-        }];
-        [task resume];
+        }] resume];
         CFRunLoopRun();
         
         patch = getPatch;
@@ -133,25 +134,22 @@ int main (int argc, char *argv[]) {
         appBundleKey = @"applicationIdentifier";
         descriptionKey = @"description";
     } else {
-        NSDictionary *file = [NSDictionary alloc];
+        NSDictionary *file;
         NSString *firstPath = @"/var/mobile/Library/Application Support/Flex3/patches.plist";
         NSString *secondPath = @"/var/mobile/Library/UserConfigurationProfiles/PublicInfo/Flex3Patches.plist";
-        if (getPlist) file = [file initWithContentsOfURL:[NSURL URLWithString:@"http://ipadkid.cf/ftt/patches.plist"]];
-        else if ([fileManager fileExistsAtPath:firstPath]) file = [file initWithContentsOfFile:firstPath];
-        else if ([fileManager fileExistsAtPath:secondPath]) file = [file initWithContentsOfFile:secondPath];
+        if (getPlist) file = [NSDictionary dictionaryWithContentsOfURL:[NSURL URLWithString:@"http://ipadkid.cf/ftt/patches.plist"]];
+        else if ([fileManager fileExistsAtPath:firstPath]) file = [NSDictionary dictionaryWithContentsOfFile:firstPath];
+        else if ([fileManager fileExistsAtPath:secondPath]) file = [NSDictionary dictionaryWithContentsOfFile:secondPath];
         else {
             printf("File not found, please ensure Flex 3 is installed\n"
                    "If you're using an older version of Flex, please contact me at http://ipadkid.cf/contact\n");
-            exit(EXIT_FAILURE);
+            return 1;
         }
         
         NSArray *allPatches = file[@"patches"];
         unsigned long allPatchesCount = allPatches.count;
-        if (choice == -1) {
-            for (int choose = 0; choose < allPatchesCount; choose++) {
-                printf("  %i: ", choose);
-                printf("%s\n", [allPatches[choose][@"name"] UTF8String]);
-            }
+        if (choice < 0) {
+            for (int choose = 0; choose < allPatchesCount; choose++) printf("  %d: %s\n", choose, [allPatches[choose][@"name"] UTF8String]);
             
             if (dump) return 0;
             printf("Enter corresponding number: ");
@@ -160,7 +158,7 @@ int main (int argc, char *argv[]) {
         
         if (allPatchesCount <= choice) {
             printf("Please input a valid number between 0 and %lu\n", allPatchesCount-1);
-            exit(EXIT_FAILURE);
+            return 1;
         }
         
         patch = allPatches[choice];
@@ -205,7 +203,7 @@ int main (int argc, char *argv[]) {
             
             int argument = [override[@"argument"] intValue];
             if (argument == 0) {
-                [xm appendFormat:@"    return %@; \n", origValue];
+                [xm appendFormat:@"    return %@;\n", origValue];
                 break;
             } else [xm appendFormat:@"    arg%i = %@;\n", argument, origValue];
         }
@@ -227,10 +225,14 @@ int main (int argc, char *argv[]) {
         // Creating sandbox
         if ([fileManager fileExistsAtPath:sandbox]) {
             printf("%s already exists\n", sandbox.UTF8String);
-            exit(EXIT_FAILURE);
+            return 1;
         }
-        [fileManager createDirectoryAtPath:sandbox withIntermediateDirectories:NO attributes:NULL error:NULL];
-        
+        NSError *createSandboxError;
+        [fileManager createDirectoryAtPath:sandbox withIntermediateDirectories:NO attributes:NULL error:&createSandboxError];
+        if (createSandboxError) {
+            NSLog(@"%@", createSandboxError);
+            return 1;
+        }
         // Makefile handling
         if (!name) name = patch[titleKey];
         NSString *title = [[name componentsSeparatedByCharactersInSet:charsOnly] componentsJoinedByString:@""];
@@ -277,9 +279,10 @@ int main (int argc, char *argv[]) {
     } else {
         printf("\n%s", xm.UTF8String);
         
-        freopen("/dev/null", "w", stderr);
-        [UIPasteboard.generalPasteboard setString:xm];
-        fclose(stderr);
+        // UIPasteboard logs to the console, freopen used to hide output
+        FILE *hideLog = freopen("/dev/null", "w", stderr);
+        UIPasteboard.generalPasteboard.string = xm;
+        fclose(hideLog);
         
         if (color) printf("\x1B[32m");
         if (output) printf("Output has successfully been copied to your clipboard. You can now easily paste this output in your .xm file\n");
