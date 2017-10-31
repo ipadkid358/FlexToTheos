@@ -2,10 +2,6 @@
 
 Enter a number and get a Theos project. Fairly straight forward CLI
 
-### Known issues: 
- - Swift classes are not yet supported
- - Tweaks for `com.flex.systemwide` may not work properly
-
 ### Compile:
 ```bash
 git clone https://github.com/ipadkid358/FlexToTheos.git

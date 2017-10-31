@@ -93,10 +93,21 @@ int main(int argc, char *argv[]) {
     NSString *descriptionKey;
     if (patchID) {
         NSDictionary *flexPrefs = [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.johncoates.Flex.plist"];
+        NSString *udid = [UIDevice.currentDevice _deviceInfoForKey:@"UniqueDeviceID"];
+        if (!udid) {
+            printf("Failed to get UDID, required to fetch patches from the cloud\n");
+            return 1;
+        }
+        
+        NSString *sessionToken = flexPrefs[@"session"];
+        if (!sessionToken) {
+            printf("Failed to get Flex session token, please open the app and make sure you're signed in\n");
+            return 1;
+        }
         NSDictionary *bodyDict = @{
                                    @"patchID":patchID,
-                                   @"deviceID":[UIDevice.currentDevice _deviceInfoForKey:@"UniqueDeviceID"],
-                                   @"sessionID":flexPrefs[@"session"]
+                                   @"deviceID":udid,
+                                   @"sessionID":sessionToken
                                    };
         
         NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:@"https://api2.getflex.co/patch/download"]];
@@ -149,7 +160,7 @@ int main(int argc, char *argv[]) {
         NSArray *allPatches = file[@"patches"];
         unsigned long allPatchesCount = allPatches.count;
         if (choice < 0) {
-            for (int choose = 0; choose < allPatchesCount; choose++) printf("  %d: %s\n", choose, [allPatches[choose][@"name"] UTF8String]);
+            for (unsigned int choose = 0; choose < allPatchesCount; choose++) printf("  %d: %s\n", choose, [allPatches[choose][@"name"] UTF8String]);
             
             if (dump) return 0;
             printf("Enter corresponding number: ");
@@ -171,17 +182,24 @@ int main(int argc, char *argv[]) {
     
     // Tweak.xm handling
     NSMutableString *xm = NSMutableString.new;
+    NSMutableArray<NSString *> *usedSwiftClasses = NSMutableArray.new;
     for (NSDictionary *top in patch[@"units"]) {
         NSDictionary *units = top[@"methodObjc"];
         
         // Class name handling
-        [xm appendFormat:@"%%hook %@\n", units[@"className"]];
+        NSString *className = units[@"className"];
+        if ([className containsString:@"."]) {
+            if (![usedSwiftClasses containsObject:className]) [usedSwiftClasses addObject:className];
+            className = [className stringByReplacingOccurrencesOfString:@"." withString:@""];
+        }
+        [xm appendFormat:@"%%hook %@\n", className];
         
         // Method name handling
         NSArray *displayName = [units[@"displayName"] componentsSeparatedByString:@")"];
-        [xm appendFormat:@"%@)%@", displayName[0], displayName[1]];
-        for (int methodBreak = 2; methodBreak < displayName.count; methodBreak++) [xm appendFormat:@")arg%i%@", methodBreak-1, displayName[methodBreak]];
-        [xm appendString:@" { \n"];
+        [xm appendFormat:@"%@)%@", [displayName[0] stringByReplacingOccurrencesOfString:@"(" withString:@" ("], [displayName[1] substringFromIndex:1]];
+        NSUInteger methodArgCount = displayName.count;
+        for (int methodBreak = 2; methodBreak < methodArgCount; methodBreak++) [xm appendFormat:@")arg%d%@", methodBreak-1, displayName[methodBreak]];
+        [xm appendString:@" {\n"];
         
         // Argument handling
         NSArray *allOverrides = top[@"overrides"];
@@ -195,22 +213,21 @@ int main(int argc, char *argv[]) {
                 if ([subToEight isEqualToString:@"(FLNULL)"]) origValue = @"nil";
                 else if ([subToEight isEqualToString:@"FLcolor:"]) {
                     NSArray *color = [[origValue substringFromIndex:8] componentsSeparatedByString:@","];
-                    origValue = [NSString stringWithFormat:@"[UIColor colorWithRed:%@.0/255.0 green:%@.0/255.0 blue:%@.0/255.0 alpha:%@.0/255.0]",
-                                 color[0], color[1], color[2], color[3]];
+                    origValue = [NSString stringWithFormat:@"[UIColor colorWithRed:%@.0/255.0 green:%@.0/255.0 blue:%@.0/255.0 alpha:%@.0/255.0]", color[0], color[1], color[2], color[3]];
                     uikit = YES;
                 } else origValue = [NSString stringWithFormat:@"@\"%@\"", origValue];
             }
             
             int argument = [override[@"argument"] intValue];
             if (argument == 0) {
-                [xm appendFormat:@"    return %@;\n", origValue];
+                [xm appendFormat:@"\treturn %@;\n", origValue];
                 break;
-            } else [xm appendFormat:@"    arg%i = %@;\n", argument, origValue];
+            } else [xm appendFormat:@"\targ%i = %@;\n", argument, origValue];
         }
         
         if (allOverrides.count == 0 || [allOverrides[0][@"argument"] intValue] > 0) {
-            if ([displayName[0] isEqualToString:@"-(void"]) [xm appendFormat:@"    %%orig;\n"];
-            else [xm appendFormat:@"    return %%orig;\n"];
+            if ([displayName[0] isEqualToString:@"-(void"]) [xm appendString:@"\t%orig;\n"];
+            else [xm appendString:@"\treturn %orig;\n"];
         }
         if (smart) {
             NSString *smartComment = top[@"name"];
@@ -218,6 +235,13 @@ int main(int argc, char *argv[]) {
             if (smartComment.length > 0 && ![smartComment isEqualToString:defaultComment]) [xm appendFormat:@"    // %@\n", smartComment];
         }
         [xm appendFormat:@"} \n%%end\n\n"];
+    }
+    
+    // swift class name handling
+    if (usedSwiftClasses.count) {
+        [xm appendString:@"%ctor {\n"];
+        for (NSString *swiftClassName in usedSwiftClasses) [xm appendFormat:@"\t%%init(%@ = objc_getClass(\"%@\"));\n", [swiftClassName stringByReplacingOccurrencesOfString:@"." withString:@""], swiftClassName];
+        [xm appendString:@"}\n\n"];
     }
     
     if (tweak) {
@@ -279,7 +303,7 @@ int main(int argc, char *argv[]) {
     } else {
         printf("\n%s", xm.UTF8String);
         
-        // UIPasteboard logs to the console, freopen used to hide output
+        // UIPasteboard logs to console, freopen used to hide output
         FILE *hideLog = freopen("/dev/null", "w", stderr);
         UIPasteboard.generalPasteboard.string = xm;
         fclose(hideLog);
@@ -294,5 +318,6 @@ int main(int argc, char *argv[]) {
         if (color) printf("\x1B[0m");
         if (output) printf("\n");
     }
+    
     return 0;
 }
