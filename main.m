@@ -10,6 +10,7 @@ int main(int argc, char *argv[]) {
     NSString *sandbox = @"Sandbox";
     NSString *name;
     NSString *patchID;
+    NSString *remote;
     BOOL dump = NO;
     BOOL tweak = YES;
     BOOL smart = NO;
@@ -20,7 +21,7 @@ int main(int argc, char *argv[]) {
     BOOL getPlist = NO;
     
     int c;
-    while ((c = getopt(argc, argv, ":c:f:n:v:p:dtsbog")) != -1)
+    while ((c = getopt(argc, argv, ":c:f:n:r:v:p:dtsbog")) != -1)
         switch(c) {
             case 'c':
                 patchID = [NSString stringWithUTF8String:optarg];
@@ -38,6 +39,9 @@ int main(int argc, char *argv[]) {
                     printf("Invalid folder name, spaces are not allowed, becuase they break make\n");
                     return 1;
                 }
+                break;
+            case 'r':
+                remote = [NSString stringWithUTF8String:optarg];
                 break;
             case 'n':
                 name = [NSString stringWithUTF8String:optarg];
@@ -75,6 +79,7 @@ int main(int argc, char *argv[]) {
                        "   -p    Directly plug in number\n"
                        "   -c    Get patches directly from the cloud. Downloads use your Flex downloads.\n"
                        "           Free accounts still have limits. Patch IDs are the last digits in share links\n"
+                       "   -r    Get remote patch from 3rd party (generally used to fetch from Sinfool repo)\n"
                        "   -d    Only print available local patches, don't do anything (cannot be used with any other options)\n"
                        "   -t    Only print Tweak.xm to console\n"
                        "   -s    Enable smart comments\n"
@@ -91,56 +96,64 @@ int main(int argc, char *argv[]) {
     NSString *titleKey;
     NSString *appBundleKey;
     NSString *descriptionKey;
-    if (patchID) {
-        NSDictionary *flexPrefs = [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.johncoates.Flex.plist"];
-        NSString *udid = [UIDevice.currentDevice _deviceInfoForKey:@"UniqueDeviceID"];
-        if (!udid) {
-            printf("Failed to get UDID, required to fetch patches from the cloud\n");
-            return 1;
-        }
-        
-        NSString *sessionToken = flexPrefs[@"session"];
-        if (!sessionToken) {
-            printf("Failed to get Flex session token, please open the app and make sure you're signed in\n");
-            return 1;
-        }
-        NSDictionary *bodyDict = @{
-                                   @"patchID":patchID,
-                                   @"deviceID":udid,
-                                   @"sessionID":sessionToken
-                                   };
-        
-        NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:@"https://api2.getflex.co/patch/download"]];
-        req.HTTPMethod = @"POST";
-        req.HTTPBody = [NSJSONSerialization dataWithJSONObject:bodyDict options:0 error:NULL];
-        
-        if (color) printf("\x1B[36m");
-        if (output) printf("Getting patch %s from Flex servers\n", patchID.UTF8String);
-        if (color) printf("\x1B[0m");
-        
-        // due to the runloop and block, the best way to exit after errors is using exit(), although I prefer returning to main to exit
-        CFRunLoopRef runLoop = CFRunLoopGetCurrent();
-        __block NSDictionary *getPatch;
-        [[NSURLSession.sharedSession dataTaskWithRequest:req completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
-            if (data == nil || error != nil) {
-                printf("Error getting patch\n");
-                if (error) NSLog(@"%@", error);
-                exit(1);
+    if (patchID || remote) {
+        if (patchID) {
+            NSDictionary *flexPrefs = [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.johncoates.Flex.plist"];
+            NSString *udid = [UIDevice.currentDevice _deviceInfoForKey:@"UniqueDeviceID"];
+            if (!udid) {
+                printf("Failed to get UDID, required to fetch patches from the cloud\n");
+                return 1;
             }
             
-            getPatch = [NSJSONSerialization JSONObjectWithData:data options:0 error:NULL];
-            if (!getPatch[@"units"]) {
-                printf("Error getting patch\n");
-                if (getPatch) NSLog(@"%@", getPatch);
-                else NSLog(@"%@", [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding]);
-                exit(1);
+            NSString *sessionToken = flexPrefs[@"session"];
+            if (!sessionToken) {
+                printf("Failed to get Flex session token, please open the app and make sure you're signed in\n");
+                return 1;
             }
+            NSDictionary *bodyDict = @{
+                                       @"patchID":patchID,
+                                       @"deviceID":udid,
+                                       @"sessionID":sessionToken
+                                       };
             
-            CFRunLoopStop(runLoop);
-        }] resume];
-        CFRunLoopRun();
+            NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:@"https://api2.getflex.co/patch/download"]];
+            req.HTTPMethod = @"POST";
+            req.HTTPBody = [NSJSONSerialization dataWithJSONObject:bodyDict options:0 error:NULL];
+            
+            if (color) printf("\x1B[36m");
+            if (output) printf("Getting patch %s from Flex servers\n", patchID.UTF8String);
+            if (color) printf("\x1B[0m");
+            
+            // due to the runloop and block, the best way to exit after errors is using exit(), although I prefer returning to main to exit
+            CFRunLoopRef runLoop = CFRunLoopGetCurrent();
+            __block NSDictionary *getPatch;
+            [[NSURLSession.sharedSession dataTaskWithRequest:req completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+                if (data == nil || error != nil) {
+                    printf("Error getting patch\n");
+                    if (error) NSLog(@"%@", error);
+                    exit(1);
+                }
+                
+                getPatch = [NSJSONSerialization JSONObjectWithData:data options:0 error:NULL];
+                if (!getPatch[@"units"]) {
+                    printf("Error getting patch\n");
+                    if (getPatch) NSLog(@"%@", getPatch);
+                    else NSLog(@"%@", [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding]);
+                    exit(1);
+                }
+                
+                CFRunLoopStop(runLoop);
+            }] resume];
+            CFRunLoopRun();
+            patch = getPatch;
+        } else if (remote) {
+            patch = [NSDictionary dictionaryWithContentsOfURL:[NSURL URLWithString:remote]];
+            if (!patch) {
+                printf("Bad remote patch\n");
+                return 1;
+            }
+        }
         
-        patch = getPatch;
         titleKey = @"title";
         appBundleKey = @"applicationIdentifier";
         descriptionKey = @"description";
@@ -239,9 +252,12 @@ int main(int argc, char *argv[]) {
     
     // swift class name handling
     if (usedSwiftClasses.count) {
-        [xm appendString:@"%ctor {\n"];
-        for (NSString *swiftClassName in usedSwiftClasses) [xm appendFormat:@"\t%%init(%@ = objc_getClass(\"%@\"));\n", [swiftClassName stringByReplacingOccurrencesOfString:@"." withString:@""], swiftClassName];
-        [xm appendString:@"}\n\n"];
+        [xm appendString:@"%ctor {\n\t%init("];
+        for (NSString *swiftClassName in usedSwiftClasses) {
+            NSString *comma = [swiftClassName isEqualToString:usedSwiftClasses.lastObject] ? @");\n" : @",\n\t      ";
+            [xm appendFormat:@"%@ = objc_getClass(\"%@\")%@", [swiftClassName stringByReplacingOccurrencesOfString:@"." withString:@""], swiftClassName, comma];
+        }
+        [xm appendString:@"\n}\n\n"];
     }
     
     if (tweak) {
