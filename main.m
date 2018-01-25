@@ -21,7 +21,7 @@ int main(int argc, char *argv[]) {
     BOOL getPlist = NO;
     
     int c;
-    while ((c = getopt(argc, argv, ":c:f:n:r:v:p:dtsbog")) != -1)
+    while ((c = getopt(argc, argv, ":c:f:n:r:v:p:dtsbog")) != -1) {
         switch(c) {
             case 'c':
                 patchID = [NSString stringWithUTF8String:optarg];
@@ -88,8 +88,18 @@ int main(int argc, char *argv[]) {
                 return 1;
                 break;
         }
+    }
     
-    if (!output) color = NO;
+    const char *cyanColor = "";
+    const char *redColor = "";
+    const char *greenColor = "";
+    const char *resetColor = "";
+    if (color) {
+        cyanColor = "\x1B[36m";
+        redColor = "\x1B[31m";
+        greenColor = "\x1B[32m";
+        resetColor = "\x1B[0m";
+    }
     
     NSFileManager *fileManager = NSFileManager.defaultManager;
     NSDictionary *patch;
@@ -110,6 +120,8 @@ int main(int argc, char *argv[]) {
                 printf("Failed to get Flex session token, please open the app and make sure you're signed in\n");
                 return 1;
             }
+            
+            // Flex sends a few more things, but these are the only required three parameters
             NSDictionary *bodyDict = @{
                                        @"patchID":patchID,
                                        @"deviceID":udid,
@@ -118,11 +130,17 @@ int main(int argc, char *argv[]) {
             
             NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:@"https://api2.getflex.co/patch/download"]];
             req.HTTPMethod = @"POST";
-            req.HTTPBody = [NSJSONSerialization dataWithJSONObject:bodyDict options:0 error:NULL];
+            NSError *jsonError;
+            req.HTTPBody = [NSJSONSerialization dataWithJSONObject:bodyDict options:0 error:&jsonError];
+            if (jsonError) {
+                printf("Error creating JSON\n");
+                NSLog(@"%@", jsonError);
+                return 1;
+            }
             
-            if (color) printf("\x1B[36m");
-            if (output) printf("Getting patch %s from Flex servers\n", patchID.UTF8String);
-            if (color) printf("\x1B[0m");
+            if (output) {
+                printf("%sGetting patch %s from Flex servers%s\n", cyanColor, patchID.UTF8String, resetColor);
+            }
             
             // due to the runloop and block, the best way to exit after errors is using exit(), although I prefer returning to main to exit
             CFRunLoopRef runLoop = CFRunLoopGetCurrent();
@@ -130,20 +148,27 @@ int main(int argc, char *argv[]) {
             [[NSURLSession.sharedSession dataTaskWithRequest:req completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
                 if (data == nil || error != nil) {
                     printf("Error getting patch\n");
-                    if (error) NSLog(@"%@", error);
+                    if (error) {
+                        NSLog(@"%@", error);
+                    }
                     exit(1);
                 }
                 
                 getPatch = [NSJSONSerialization JSONObjectWithData:data options:0 error:NULL];
                 if (!getPatch[@"units"]) {
                     printf("Error getting patch\n");
-                    if (getPatch) NSLog(@"%@", getPatch);
-                    else NSLog(@"%@", [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding]);
+                    if (getPatch) {
+                        NSLog(@"%@", getPatch);
+                    } else {
+                        NSLog(@"%@", [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding]);
+                    }
+                    
                     exit(1);
                 }
                 
                 CFRunLoopStop(runLoop);
             }] resume];
+            
             CFRunLoopRun();
             patch = getPatch;
         } else if (remote) {
@@ -161,10 +186,13 @@ int main(int argc, char *argv[]) {
         NSDictionary *file;
         NSString *firstPath = @"/var/mobile/Library/Application Support/Flex3/patches.plist";
         NSString *secondPath = @"/var/mobile/Library/UserConfigurationProfiles/PublicInfo/Flex3Patches.plist";
-        if (getPlist) file = [NSDictionary dictionaryWithContentsOfURL:[NSURL URLWithString:@"http://ipadkid.cf/ftt/patches.plist"]];
-        else if ([fileManager fileExistsAtPath:firstPath]) file = [NSDictionary dictionaryWithContentsOfFile:firstPath];
-        else if ([fileManager fileExistsAtPath:secondPath]) file = [NSDictionary dictionaryWithContentsOfFile:secondPath];
-        else {
+        if (getPlist) {
+            file = [NSDictionary dictionaryWithContentsOfURL:[NSURL URLWithString:@"http://ipadkid.cf/ftt/patches.plist"]];
+        } else if ([fileManager fileExistsAtPath:firstPath]) {
+            file = [NSDictionary dictionaryWithContentsOfFile:firstPath];
+        } else if ([fileManager fileExistsAtPath:secondPath]) {
+            file = [NSDictionary dictionaryWithContentsOfFile:secondPath];
+        } else {
             printf("File not found, please ensure Flex 3 is installed\n"
                    "If you're using an older version of Flex, please contact me at http://ipadkid.cf/contact\n");
             return 1;
@@ -173,9 +201,14 @@ int main(int argc, char *argv[]) {
         NSArray *allPatches = file[@"patches"];
         unsigned long allPatchesCount = allPatches.count;
         if (choice < 0) {
-            for (unsigned int choose = 0; choose < allPatchesCount; choose++) printf("  %d: %s\n", choose, [allPatches[choose][@"name"] UTF8String]);
+            for (unsigned int choose = 0; choose < allPatchesCount; choose++) {
+                printf("  %d: %s\n", choose, [allPatches[choose][@"name"] UTF8String]);
+            }
             
-            if (dump) return 0;
+            if (dump) {
+                return 0;
+            }
+            
             printf("Enter corresponding number: ");
             scanf("%i", &choice);
         }
@@ -202,59 +235,86 @@ int main(int argc, char *argv[]) {
         // Class name handling
         NSString *className = units[@"className"];
         if ([className containsString:@"."]) {
-            if (![usedSwiftClasses containsObject:className]) [usedSwiftClasses addObject:className];
+            if (![usedSwiftClasses containsObject:className]) {
+                [usedSwiftClasses addObject:className];
+            }
+            
             className = [className stringByReplacingOccurrencesOfString:@"." withString:@""];
         }
+        
         [xm appendFormat:@"%%hook %@\n", className];
         
         // Method name handling
         NSArray *displayName = [units[@"displayName"] componentsSeparatedByString:@")"];
         [xm appendFormat:@"%@)%@", [displayName[0] stringByReplacingOccurrencesOfString:@"(" withString:@" ("], [displayName[1] substringFromIndex:1]];
         NSUInteger methodArgCount = displayName.count;
-        for (int methodBreak = 2; methodBreak < methodArgCount; methodBreak++) [xm appendFormat:@")arg%d%@", methodBreak-1, displayName[methodBreak]];
+        for (int methodBreak = 2; methodBreak < methodArgCount; methodBreak++) {
+            [xm appendFormat:@")arg%d%@", methodBreak-1, displayName[methodBreak]];
+        }
+        
         [xm appendString:@" {\n"];
+        
+        if (smart) {
+            NSString *smartComment = top[@"name"];
+            NSString *defaultComment = [NSString stringWithFormat:@"Unit for %@", top[@"methodObjc"][@"displayName"]];
+            if (smartComment.length > 0 && ![smartComment isEqualToString:defaultComment]) {
+                [xm appendFormat:@"    // %@\n", smartComment];
+            }
+        }
         
         // Argument handling
         NSArray *allOverrides = top[@"overrides"];
         for (NSDictionary *override in allOverrides) {
-            if (override.count == 0) continue;
+            if (override.count == 0) {
+                continue;
+            }
+            
             NSString *origValue = override[@"value"][@"value"];
             
             if ([origValue isKindOfClass:NSString.class]) {
                 NSString *subToEight = origValue.length >= 8 ? [origValue substringToIndex:8] : @"";
                 
-                if ([subToEight isEqualToString:@"(FLNULL)"]) origValue = @"nil";
-                else if ([subToEight isEqualToString:@"FLcolor:"]) {
+                if ([subToEight isEqualToString:@"(FLNULL)"]) {
+                    origValue = @"NULL";
+                } else if ([subToEight isEqualToString:@"FLcolor:"]) {
                     NSArray *color = [[origValue substringFromIndex:8] componentsSeparatedByString:@","];
                     origValue = [NSString stringWithFormat:@"[UIColor colorWithRed:%@.0/255.0 green:%@.0/255.0 blue:%@.0/255.0 alpha:%@.0/255.0]", color[0], color[1], color[2], color[3]];
                     uikit = YES;
-                } else origValue = [NSString stringWithFormat:@"@\"%@\"", origValue];
+                } else {
+                    origValue = [NSString stringWithFormat:@"@\"%@\"", origValue];
+                }
             }
             
             int argument = [override[@"argument"] intValue];
             if (argument == 0) {
-                [xm appendFormat:@"\treturn %@;\n", origValue];
+                [xm appendFormat:@"    return %@;\n", origValue];
                 break;
-            } else [xm appendFormat:@"\targ%i = %@;\n", argument, origValue];
+            } else {
+                [xm appendFormat:@"    arg%i = %@;\n", argument, origValue];
+            }
         }
         
-        if (allOverrides.count == 0 || [allOverrides[0][@"argument"] intValue] > 0) {
-            if ([displayName[0] isEqualToString:@"-(void"]) [xm appendString:@"\t%orig;\n"];
-            else [xm appendString:@"\treturn %orig;\n"];
+        // when processing the last argument, or there are no arguments, call orig
+        NSUInteger overrideCount = allOverrides.count;
+        if (overrideCount == 0 || [allOverrides[0][@"argument"] intValue] > 0) {
+            if ([displayName[0] isEqualToString:@"-(void"]) {
+                // I *think* if the return is void, and there are no arguments, Flex basically removes the function
+                if (overrideCount > 0) {
+                    [xm appendString:@"    %orig;\n"];
+                }
+            } else {
+                [xm appendString:@"    return %orig;\n"];
+            }
         }
-        if (smart) {
-            NSString *smartComment = top[@"name"];
-            NSString *defaultComment = [NSString stringWithFormat:@"Unit for %@", top[@"methodObjc"][@"displayName"]];
-            if (smartComment.length > 0 && ![smartComment isEqualToString:defaultComment]) [xm appendFormat:@"    // %@\n", smartComment];
-        }
+        
         [xm appendFormat:@"} \n%%end\n\n"];
     }
     
     // swift class name handling
     if (usedSwiftClasses.count) {
-        [xm appendString:@"%ctor {\n\t%init("];
+        [xm appendString:@"%ctor {\n    %init("];
         for (NSString *swiftClassName in usedSwiftClasses) {
-            NSString *comma = [swiftClassName isEqualToString:usedSwiftClasses.lastObject] ? @");\n" : @",\n\t      ";
+            NSString *comma = [swiftClassName isEqualToString:usedSwiftClasses.lastObject] ? @");\n" : @",\n        ";
             [xm appendFormat:@"%@ = objc_getClass(\"%@\")%@", [swiftClassName stringByReplacingOccurrencesOfString:@"." withString:@""], swiftClassName, comma];
         }
         [xm appendString:@"\n}\n\n"];
@@ -267,27 +327,37 @@ int main(int argc, char *argv[]) {
             printf("%s already exists\n", sandbox.UTF8String);
             return 1;
         }
+        
         NSError *createSandboxError;
         [fileManager createDirectoryAtPath:sandbox withIntermediateDirectories:NO attributes:NULL error:&createSandboxError];
         if (createSandboxError) {
             NSLog(@"%@", createSandboxError);
             return 1;
         }
+        
         // Makefile handling
-        if (!name) name = patch[titleKey];
+        if (!name) {
+            name = patch[titleKey];
+        }
+        
         NSString *title = [[name componentsSeparatedByCharactersInSet:charsOnly] componentsJoinedByString:@""];
         NSMutableString *makefile = [NSMutableString stringWithFormat:@""
-                                     "DEBUG = 0\n"
                                      "include $(THEOS)/makefiles/common.mk\n\n"
                                      "TWEAK_NAME = %@\n"
                                      "%@_FILES = Tweak.xm\n", title, title];
-        if (uikit) [makefile appendFormat:@"%@_FRAMEWORKS = UIKit\n", title];
+        if (uikit) {
+            [makefile appendFormat:@"%@_FRAMEWORKS = UIKit\n", title];
+        }
+        
         [makefile appendString:@"\ninclude $(THEOS_MAKE_PATH)/tweak.mk\n"];
         [makefile writeToFile:[sandbox stringByAppendingPathComponent:@"Makefile"] atomically:YES encoding:NSUTF8StringEncoding error:NULL];
         
         // plist handling
         NSString *executable = patch[appBundleKey];
-        if ([executable isEqualToString:@"com.flex.systemwide"]) executable = @"com.apple.UIKit";
+        if ([executable isEqualToString:@"com.flex.systemwide"]) {
+            executable = @"com.apple.UIKit";
+        }
+        
         NSDictionary *plist = @{
                                 @"Filter":@{
                                         @"Bundles":@[executable]
@@ -313,9 +383,9 @@ int main(int argc, char *argv[]) {
         
         [xm writeToFile:[sandbox stringByAppendingPathComponent:@"Tweak.xm"] atomically:YES encoding:NSUTF8StringEncoding error:NULL];
         
-        if (color) printf("\x1B[32m");
-        if (output) printf("Project %s created in %s\n", title.UTF8String, sandbox.UTF8String);
-        if (color) printf("\x1B[0m");
+        if (output) {
+            printf("%sProject %s created in %s%s\n", greenColor, title.UTF8String, sandbox.UTF8String, resetColor);
+        }
     } else {
         printf("\n%s", xm.UTF8String);
         
@@ -324,15 +394,15 @@ int main(int argc, char *argv[]) {
         UIPasteboard.generalPasteboard.string = xm;
         fclose(hideLog);
         
-        if (color) printf("\x1B[32m");
-        if (output) printf("Output has successfully been copied to your clipboard. You can now easily paste this output in your .xm file\n");
-        if (uikit) {
-            if (color) printf("\x1B[31m");
-            if (output) printf("\nPlease add UIKit to your project's FRAMEWORKS because this tweak includes color specifying\n");
+        if (output) {
+            printf("%sOutput has successfully been copied to your clipboard. You can now easily paste this output in your .xm file\n", greenColor);
+            
+            if (uikit) {
+                printf("\n%sPlease add UIKit to your project's FRAMEWORKS because this tweak includes color specifying\n", redColor);
+            }
+            
+            printf("%s\n", resetColor);
         }
-        
-        if (color) printf("\x1B[0m");
-        if (output) printf("\n");
     }
     
     return 0;

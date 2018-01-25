@@ -21,14 +21,17 @@ Usage: ./ftt [OPTIONS]
    -p    Directly plug in number
    -c    Get patches directly from the cloud. Downloads use your Flex downloads.
            Free accounts still have limits. Patch IDs are the last digits in share links
+   -r    Get remote patch from 3rd party (generally used to fetch from Sinfool repo)
    -d    Only print available local patches, don't do anything (cannot be used with any other options)
    -t    Only print Tweak.xm to console
    -s    Enable smart comments
    -o    Disable output, except errors
    -b    Disable colors in output
 ```
-ex. `./ftt -f MyFolder -n tweak -v 1.0` 
 
-ex. `./ftt -tsp2`
+Examples:
+`./ftt -f MyFolder -n tweak -v 1.0` 
 
-ex. `./ftt -b -c 34224`
+`./ftt -tsp2`
+
+`./ftt -b -c 34224`
