@@ -72,19 +72,22 @@ int main(int argc, char *argv[]) {
                 break;
             case '?':
                 printf("Usage: %s [OPTIONS]\n"
-                       " Options:\n"
+                       " Naming:\n"
                        "   -f    Set name of folder created for project (default is %s)\n"
                        "   -n    Override the tweak name\n"
                        "   -v    Set version (default is  %s)\n"
-                       "   -p    Directly plug in number\n"
-                       "   -c    Get patches directly from the cloud. Downloads use your Flex downloads.\n"
-                       "           Free accounts still have limits. Patch IDs are the last digits in share links\n"
-                       "   -r    Get remote patch from 3rd party (generally used to fetch from Sinfool repo)\n"
+                       " Output:\n"
                        "   -d    Only print available local patches, don't do anything (cannot be used with any other options)\n"
                        "   -t    Only print Tweak.xm to console\n"
                        "   -s    Enable smart comments\n"
                        "   -o    Disable output, except errors\n"
-                       "   -b    Disable colors in output\n", argv[0], sandbox.UTF8String, version.UTF8String);
+                       "   -b    Disable colors in output\n"
+                       " Source:\n"
+                       "   -p    Directly plug in number\n"
+                       "   -c    Get patches directly from the cloud. Downloads use your Flex downloads.\n"
+                       "           Free accounts still have limits. Patch IDs are the last digits in share links\n"
+                       "   -r    Get remote patch from 3rd party (generally used to fetch from Sinfool repo)\n"
+                       , argv[0], sandbox.UTF8String, version.UTF8String);
                 return 1;
                 break;
         }
@@ -102,6 +105,7 @@ int main(int argc, char *argv[]) {
     }
     
     NSFileManager *fileManager = NSFileManager.defaultManager;
+    
     NSDictionary *patch;
     NSString *titleKey;
     NSString *appBundleKey;
@@ -133,8 +137,7 @@ int main(int argc, char *argv[]) {
             NSError *jsonError;
             req.HTTPBody = [NSJSONSerialization dataWithJSONObject:bodyDict options:0 error:&jsonError];
             if (jsonError) {
-                printf("Error creating JSON\n");
-                NSLog(@"%@", jsonError);
+                NSLog(@"Error creating JSON: %@", jsonError);
                 return 1;
             }
             
@@ -194,7 +197,7 @@ int main(int argc, char *argv[]) {
             file = [NSDictionary dictionaryWithContentsOfFile:secondPath];
         } else {
             printf("File not found, please ensure Flex 3 is installed\n"
-                   "If you're using an older version of Flex, please contact me at http://ipadkid.cf/contact\n");
+                   "If you're using an older version of Flex, please contact me at https://ipadkid.cf/contact\n");
             return 1;
         }
         
@@ -210,7 +213,7 @@ int main(int argc, char *argv[]) {
             }
             
             printf("Enter corresponding number: ");
-            scanf("%i", &choice);
+            scanf("%d", &choice);
         }
         
         if (allPatchesCount <= choice) {
@@ -360,7 +363,9 @@ int main(int argc, char *argv[]) {
         
         NSDictionary *plist = @{
                                 @"Filter":@{
-                                        @"Bundles":@[executable]
+                                        @"Bundles":@[
+                                                executable
+                                                ]
                                         }
                                 };
         NSString *plistPath = [[sandbox stringByAppendingPathComponent:title] stringByAppendingPathExtension:@"plist"];
@@ -372,7 +377,8 @@ int main(int argc, char *argv[]) {
         NSString *description = [patch[descriptionKey] stringByReplacingOccurrencesOfString:@"\n" withString:@"\n "];
         NSString *control = [NSString stringWithFormat:@""
                              "Package: com.%@.%@\n"
-                             "Name: %@\nAuthor: %@\n"
+                             "Name: %@\n"
+                             "Author: %@\n"
                              "Description: %@\n"
                              "Depends: mobilesubstrate\n"
                              "Maintainer: ipad_kid <ipadkid358@gmail.com>\n"
