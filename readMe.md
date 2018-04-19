@@ -1,6 +1,6 @@
 ## FlexToTheos 
 
-Enter a number and get a Theos project. Fairly straight forward CLI
+Convert Flex patches into Theos projects. Fairly straight forward CLI
 
 Binaries are available in the [Release](https://github.com/ipadkid358/FlexToTheos/releases) tab, my [Cydia Repo](https://ipadkid.cf/) has Debian packages for installing easily on iOS devices.
 

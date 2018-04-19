@@ -2,11 +2,16 @@
 #import <MobileCoreServices/UTCoreTypes.h>
 
 @interface UIDevice (PrivateBlackJacket)
+/**
+ @brief Get specific device information from MobileGestalt
+ 
+ @param key The key to lookup
+ 
+ @return The value returned by MGCopyAnswer
+ */
 - (NSString *)_deviceInfoForKey:(NSString *)key;
 @end
 
-
-// TODO: Optimze code - combine logos and plain objc
 /**
  @brief Convert a Flex patch to code
  
@@ -18,126 +23,58 @@
  @return a UTF8 encoded string of the code
  */
 NSString *codeFromFlexPatch(NSDictionary *patch, BOOL comments, BOOL *uikit, BOOL logos) {
-    NSMutableString *xm = NSMutableString.new;
-    if (logos) {
-        NSMutableArray<NSString *> *usedSwiftClasses = NSMutableArray.new;
-        for (NSDictionary *top in patch[@"units"]) {
-            NSDictionary *units = top[@"methodObjc"];
-            
-            // Class name handling
-            NSString *className = units[@"className"];
-            if ([className containsString:@"."]) {
-                if (![usedSwiftClasses containsObject:className]) {
-                    [usedSwiftClasses addObject:className];
-                }
-                
-                className = [className stringByReplacingOccurrencesOfString:@"." withString:@""];
-            }
-            
-            [xm appendFormat:@"%%hook %@\n", className];
-            
-            // Method name handling
-            NSArray *displayName = [units[@"displayName"] componentsSeparatedByString:@")"];
-            [xm appendFormat:@"%@)%@", [displayName[0] stringByReplacingOccurrencesOfString:@"(" withString:@" ("], [displayName[1] substringFromIndex:1]];
-            NSUInteger methodArgCount = displayName.count;
-            for (int methodBreak = 2; methodBreak < methodArgCount; methodBreak++) {
-                [xm appendFormat:@")arg%d%@", methodBreak-1, displayName[methodBreak]];
-            }
-            
-            [xm appendString:@" {\n"];
-            
-            if (comments) {
-                NSString *smartComment = top[@"name"];
-                NSString *defaultComment = [NSString stringWithFormat:@"Unit for %@", top[@"methodObjc"][@"displayName"]];
-                if (smartComment.length > 0 && ![smartComment isEqualToString:defaultComment]) {
-                    [xm appendFormat:@"    // %@\n", smartComment];
-                }
-            }
-            
-            // Argument handling
-            NSArray *allOverrides = top[@"overrides"];
-            for (NSDictionary *override in allOverrides) {
-                if (override.count == 0) {
-                    continue;
-                }
-                
-                NSString *origValue = override[@"value"][@"value"];
-                
-                if ([origValue isKindOfClass:NSString.class]) {
-                    NSString *subToEight = origValue.length >= 8 ? [origValue substringToIndex:8] : @"";
-                    
-                    if ([subToEight isEqualToString:@"(FLNULL)"]) {
-                        origValue = @"NULL";
-                    } else if ([subToEight isEqualToString:@"FLcolor:"]) {
-                        NSArray *color = [[origValue substringFromIndex:8] componentsSeparatedByString:@","];
-                        origValue = [NSString stringWithFormat:@"[UIColor colorWithRed:%@.0/255.0 green:%@.0/255.0 blue:%@.0/255.0 alpha:%@.0/255.0]", color[0], color[1], color[2], color[3]];
-                        *uikit = YES;
-                    } else {
-                        origValue = [NSString stringWithFormat:@"@\"%@\"", origValue];
-                    }
-                }
-                
-                int argument = [override[@"argument"] intValue];
-                if (argument == 0) {
-                    [xm appendFormat:@"    return %@;\n", origValue];
-                    break;
-                } else {
-                    [xm appendFormat:@"    arg%i = %@;\n", argument, origValue];
-                }
-            }
-            
-            // when processing the last argument, or there are no arguments, call orig
-            NSUInteger overrideCount = allOverrides.count;
-            if (overrideCount == 0 || [allOverrides[0][@"argument"] intValue] > 0) {
-                if ([displayName[0] isEqualToString:@"-(void"]) {
-                    // I *think* if the return is void, and there are no arguments, Flex basically removes the function
-                    if (overrideCount > 0) {
-                        [xm appendString:@"    %orig;\n"];
-                    }
-                } else {
-                    [xm appendString:@"    return %orig;\n"];
-                }
-            }
-            
-            [xm appendFormat:@"} \n%%end\n\n"];
+    NSString *ret;
+    @autoreleasepool {
+        NSMutableString *xm = [NSMutableString string];
+        
+        if (!logos) {
+            [xm appendString:@"#include <substrate.h>\n\n"];
         }
         
-        // swift class name handling
-        if (usedSwiftClasses.count) {
-            [xm appendString:@"%ctor {\n    %init("];
-            for (NSString *swiftClassName in usedSwiftClasses) {
-                NSString *comma = [swiftClassName isEqualToString:usedSwiftClasses.lastObject] ? @");\n" : @",\n        ";
-                [xm appendFormat:@"%@ = objc_getClass(\"%@\")%@", [swiftClassName stringByReplacingOccurrencesOfString:@"." withString:@""], swiftClassName, comma];
-            }
-            [xm appendString:@"\n}"];
-        }
-    } else {
-        [xm appendString:@"#include <substrate.h>\n\n"];
+        NSString *swiftPatchStr = @"PatchedSwiftClassName";
+        
         NSMutableString *constructor = [NSMutableString stringWithString:@"static __attribute__((constructor)) void _logosLocalInit() {\n"];
-        NSMutableArray *usedClasses = [NSMutableArray array];
+        NSMutableArray<NSString *> *usedClasses = [NSMutableArray array];
+        NSMutableArray<NSString *> *usedSwiftClasses = [NSMutableArray array];
         
         for (NSDictionary *unit in patch[@"units"]) {
             NSDictionary *objcInfo = unit[@"methodObjc"];
             NSString *className = objcInfo[@"className"];
             NSString *selectorName = objcInfo[@"selector"];
+            
             NSString *logosConvention = [selectorName stringByReplacingOccurrencesOfString:@":" withString:@"$"];
-            NSString *implMainName = [NSString stringWithFormat:@"_ftt_meth_$%@$%@", className, logosConvention];
+            NSString *cleanClassName = [className stringByReplacingOccurrencesOfString:@"." withString:swiftPatchStr];
+            
+            NSString *implMainName = [NSString stringWithFormat:@"_ftt_meth_$%@$%@", cleanClassName, logosConvention];
             NSString *origImplName = [NSString stringWithFormat:@"_orig%@", implMainName];
             NSString *patchImplName = [NSString stringWithFormat:@"_patched%@", implMainName];
             
-            NSMutableString *implArgList= [NSMutableString stringWithString:@"(id self, SEL _cmd"];
             NSString *flexDisplayName = objcInfo[@"displayName"];
             NSArray<NSString *> *displayName = [flexDisplayName componentsSeparatedByString:@")"];
-            NSString *returnType = [displayName.firstObject substringFromIndex:2];
-            NSMutableString *justArgCalls = [NSMutableString stringWithString:@"(self, _cmd"];
+            NSString *bashedMethodTypeValue = displayName.firstObject;
+            NSString *returnType = [bashedMethodTypeValue substringFromIndex:2];
+            
+            NSMutableString *implArgList = [NSMutableString stringWithString:@"(id self, SEL _cmd"];
+            NSMutableString *justArgCall = [NSMutableString stringWithString:@"(self, _cmd"];
+            NSMutableString *justArgType = [NSMutableString stringWithString:@"(id, SEL"];
+            
+            NSMutableString *realMethodName = [NSMutableString string];
+            [realMethodName appendString:[bashedMethodTypeValue stringByReplacingOccurrencesOfString:@"(" withString:@" ("]];
+            [realMethodName appendFormat:@")%@", [displayName[1] substringFromIndex:1]];
             
             for (int displayId = 1; displayId < displayName.count-1; displayId++) {
-                NSArray *typeBreakup = [displayName[displayId] componentsSeparatedByString:@"("];
-                [implArgList appendFormat:@", %@ arg%d", typeBreakup.lastObject, displayId];
-                [justArgCalls appendFormat:@", arg%d", displayId];
+                NSArray<NSString *> *typeBreakup = [displayName[displayId] componentsSeparatedByString:@"("];
+                NSString *argType = typeBreakup.lastObject;
+                [implArgList appendFormat:@", %@ arg%d", argType, displayId];
+                [justArgCall appendFormat:@", arg%d", displayId];
+                [justArgType appendFormat:@", %@", argType];
+                
+                [realMethodName appendFormat:@")arg%d%@", displayId, displayName[displayId+1]];
             }
+            
             [implArgList appendString:@")"];
-            [justArgCalls appendString:@")"];
+            [justArgCall appendString:@")"];
+            [justArgType appendString:@")"];
             
             BOOL callsOrig = NO;
             
@@ -159,13 +96,14 @@ NSString *codeFromFlexPatch(NSDictionary *patch, BOOL comments, BOOL *uikit, BOO
                 NSString *origValue = override[@"value"][@"value"];
                 
                 if ([origValue isKindOfClass:NSString.class]) {
-                    NSString *subToEight = origValue.length >= 8 ? [origValue substringToIndex:8] : @"";
+                    NSString *subToEight = origValue.length >= 8 ? [origValue substringToIndex:8] : NULL;
                     
                     if ([subToEight isEqualToString:@"(FLNULL)"]) {
                         origValue = @"NULL";
                     } else if ([subToEight isEqualToString:@"FLcolor:"]) {
                         NSArray *color = [[origValue substringFromIndex:8] componentsSeparatedByString:@","];
-                        origValue = [NSString stringWithFormat:@"[UIColor colorWithRed:%@.0/255.0 green:%@.0/255.0 blue:%@.0/255.0 alpha:%@.0/255.0]", color[0], color[1], color[2], color[3]];
+                        NSString *restrict colorBase = @"[UIColor colorWithRed:%@.0/255.0 green:%@.0/255.0 blue:%@.0/255.0 alpha:%@.0/255.0]";
+                        origValue = [NSString stringWithFormat:colorBase, color[0], color[1], color[2], color[3]];
                         *uikit = YES;
                     } else {
                         origValue = [NSString stringWithFormat:@"@\"%@\"", origValue];
@@ -183,43 +121,79 @@ NSString *codeFromFlexPatch(NSDictionary *patch, BOOL comments, BOOL *uikit, BOO
             
             NSUInteger overrideCount = allOverrides.count;
             if (overrideCount == 0 || [allOverrides.firstObject[@"argument"] intValue] > 0) {
-                if ([displayName[0] isEqualToString:@"-(void"]) {
+                if ([bashedMethodTypeValue isEqualToString:@"-(void"]) {
                     if (overrideCount > 0) {
-                        callsOrig = YES;
-                        [implBody appendFormat:@"    %@%@;\n", origImplName, justArgCalls];
+                        if (logos) {
+                            [implBody appendString:@"    %orig;\n"];
+                        } else {
+                            callsOrig = YES;
+                            [implBody appendFormat:@"    %@%@;\n", origImplName, justArgCall];
+                        }
                     }
                 } else {
-                    callsOrig = YES;
-                    [implBody appendFormat:@"    return %@%@;\n", origImplName, justArgCalls];
+                    if (logos) {
+                        [implBody appendString:@"    return %orig;\n"];
+                    } else {
+                        callsOrig = YES;
+                        [implBody appendFormat:@"    return %@%@;\n", origImplName, justArgCall];
+                    }
                 }
             }
             
             if (callsOrig) {
-                [xm appendFormat:@"static %@ (*%@)%@;\n", returnType, origImplName, implArgList];
+                [xm appendFormat:@"static %@ (*%@)%@;\n", returnType, origImplName, justArgType];
             }
-            [xm appendFormat:@"static %@ %@%@ {\n%@}\n\n", returnType, patchImplName, implArgList, implBody];
             
-            NSString *cleanClassName = [className stringByReplacingOccurrencesOfString:@"." withString:@"DOT"];
+            if (logos) {
+                [xm appendFormat:@"%%hook %@\n%@ {\n%@}\n%%end\n\n", cleanClassName, realMethodName, implBody];
+            } else {
+                [xm appendFormat:@"static %@ %@%@ {\n%@}\n\n", returnType, patchImplName, implArgList, implBody];
+            }
+            
             NSString *internalClassName = [NSString stringWithFormat:@"_ftt_class_%@", cleanClassName];
             
-            if (![usedClasses containsObject:className]) {
-                [constructor appendFormat:@"    Class %@ = objc_getClass(\"%@\");\n", internalClassName, className];
-                [usedClasses addObject:className];
-            }
-            [constructor appendFormat:@"    MSHookMessageEx(%@, @selector(%@), (IMP)%@, ", internalClassName, selectorName, patchImplName];
-            if (callsOrig) {
-                [constructor appendFormat:@"(IMP *)%@", origImplName];
+            if (logos) {
+                if ([className containsString:@"."]) {
+                    if (![usedSwiftClasses containsObject:className]) {
+                        [usedSwiftClasses addObject:className];
+                    }
+                }
             } else {
-                [constructor appendString:@"NULL"];
+                if (![usedClasses containsObject:className]) {
+                    [constructor appendFormat:@"    Class %@ = objc_getClass(\"%@\");\n", internalClassName, className];
+                    [usedClasses addObject:className];
+                }
+                
+                [constructor appendFormat:@"    MSHookMessageEx(%@, @selector(%@), (IMP)%@, ", internalClassName, selectorName, patchImplName];
+                if (callsOrig) {
+                    [constructor appendFormat:@"(IMP *)%@", origImplName];
+                } else {
+                    [constructor appendString:@"NULL"];
+                }
+                [constructor appendString:@");\n"];
             }
-            [constructor appendString:@");\n"];
         }
         
-        [constructor appendString:@"}"];
-        [xm appendString:constructor];
+        if (logos) {
+            if (usedSwiftClasses.count) {
+                [xm appendString:@"%ctor {\n    %init("];
+                NSString *lastClass = usedSwiftClasses.lastObject;
+                for (NSString *className in usedSwiftClasses) {
+                    NSString *comma = [className isEqualToString:lastClass] ? @");\n" : @",\n        ";
+                    NSString *patchedClassName = [className stringByReplacingOccurrencesOfString:@"." withString:swiftPatchStr];
+                    [xm appendFormat:@"%@ = objc_getClass(\"%@\")%@", patchedClassName, className, comma];
+                }
+                [xm appendString:@"\n}\n"];
+            }
+        } else {
+            [constructor appendString:@"}\n"];
+            [xm appendString:constructor];
+        }
+        
+        ret = [NSString stringWithString:xm];
     }
-    [xm appendString:@"\n\n"];
-    return xm;
+    
+    return ret;
 }
 
 int main(int argc, char *argv[]) {
@@ -530,7 +504,7 @@ int main(int argc, char *argv[]) {
             printf("%sProject %s created in %s%s\n", greenColor, title.UTF8String, sandbox.UTF8String, resetColor);
         }
     } else {
-        printf("\n%s", genedCode.UTF8String);
+        puts(genedCode.UTF8String);
         
         [UIPasteboard.generalPasteboard setValue:genedCode forPasteboardType:(id)kUTTypeUTF8PlainText];
         
