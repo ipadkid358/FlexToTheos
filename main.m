@@ -1,3 +1,6 @@
+#import <TargetConditionals.h>
+
+#if TARGET_OS_IPHONE
 #import <UIKit/UIKit.h>
 #import <MobileCoreServices/UTCoreTypes.h>
 
@@ -11,6 +14,12 @@
  */
 - (NSString *)_deviceInfoForKey:(NSString *)key;
 @end
+
+#elif TARGET_OS_MAC
+#import <Foundation/Foundation.h>
+#else
+#error Unknown target, please make sure you're compiling for iOS or macOS
+#endif
 
 /**
  @brief Convert a Flex patch to code
@@ -197,98 +206,112 @@ NSString *codeFromFlexPatch(NSDictionary *patch, BOOL comments, BOOL *uikit, BOO
 }
 
 int main(int argc, char *argv[]) {
+#if TARGET_OS_IPHONE
     int choice = -1;
+    BOOL dump = NO;
+    
+    // should be used for testing only, not documented
+    BOOL getPlist = NO;
+#endif
     NSString *version = @"0.0.1";
     NSString *sandbox = @"Sandbox";
     NSString *name;
     NSString *patchID;
     NSString *remote;
-    BOOL dump = NO;
     BOOL tweak = YES;
     BOOL logos = YES;
     BOOL smart = NO;
     BOOL output = YES;
     BOOL color = YES;
     
-    // should be used for testing only, not documented
-    BOOL getPlist = NO;
-    
+    const char *switchOpts;
+#if TARGET_OS_IPHONE
+    switchOpts = ":c:f:n:r:v:p:dtlsbog";
+#else
+    switchOpts = ":f:n:r:v:tlsbo";
+#endif
     int c;
-    while ((c = getopt(argc, argv, ":c:f:n:r:v:p:dtlsbog")) != -1) {
-        switch(c) {
-            case 'c': {
-                patchID = [NSString stringWithUTF8String:optarg];
-                unsigned int smallValidPatch = 6106;
-                if (patchID.intValue < smallValidPatch) {
-                    printf("Sorry, this is an older patch, and not yet supported\n"
-                           "Please use a patch number greater than %d\n"
-                           "Patch numbers are the last digits in share links\n", smallValidPatch);
-                    return 1;
+    while ((c = getopt(argc, argv, switchOpts)) != -1) {
+        switch (c) {
+                case 'f': {
+                    sandbox = [NSString stringWithUTF8String:optarg];
+                    if ([[sandbox componentsSeparatedByString:@" "] count] > 1) {
+                        puts("Invalid folder name, spaces are not allowed, becuase they break make(1)");
+                        return 1;
+                    }
                 }
-            }
                 break;
-            case 'f': {
-                sandbox = [NSString stringWithUTF8String:optarg];
-                if ([[sandbox componentsSeparatedByString:@" "] count] > 1) {
-                    printf("Invalid folder name, spaces are not allowed, becuase they break make\n");
-                    return 1;
-                }
-            }
-                break;
-            case 'r':
+                case 'r':
                 remote = [NSString stringWithUTF8String:optarg];
                 break;
-            case 'n':
+                case 'n':
                 name = [NSString stringWithUTF8String:optarg];
                 break;
-            case 'v':
+                case 'v':
                 version = [NSString stringWithUTF8String:optarg];
                 break;
-            case 'p':
+#if TARGET_OS_IPHONE
+                case 'c': {
+                    patchID = [NSString stringWithUTF8String:optarg];
+                    unsigned int smallValidPatch = 6106;
+                    if (patchID.intValue < smallValidPatch) {
+                        printf("Sorry, this is an older patch, and not yet supported\n"
+                               "Please use a patch number greater than %d\n"
+                               "Patch numbers are the last digits in share links\n", smallValidPatch);
+                        return 1;
+                    }
+                }
+                break;
+                case 'p':
                 choice = [[NSString stringWithUTF8String:optarg] intValue];
                 break;
-            case 'd':
+                case 'd':
                 dump = YES;
                 break;
-            case 't':
-                tweak = NO;
-                break;
-            case 'l':
-                logos = NO;
-                break;
-            case 's':
-                smart = YES;
-                break;
-            case 'o':
-                output = NO;
-                break;
-            case 'b':
-                color = NO;
-                break;
-            case 'g':
+                case 'g':
                 getPlist = YES;
                 break;
-            case '?': {
-                printf("Usage: %s [OPTIONS]\n"
-                       " Naming:\n"
-                       "   -f    Set name of folder created for project (default is %s)\n"
-                       "   -n    Override the tweak name\n"
-                       "   -v    Set version (default is  %s)\n"
-                       " Output:\n"
-                       "   -d    Only print available local patches, don't do anything (cannot be used with any other options)\n"
-                       "   -t    Only print code to console\n"
-                       "   -l    Generate plain Obj-C instead of logos\n"
-                       "   -s    Enable smart comments\n"
-                       "   -o    Disable output, except errors\n"
-                       "   -b    Disable colors in output\n"
-                       " Source:\n"
-                       "   -p    Directly plug in number\n"
-                       "   -c    Get patches directly from the cloud. Downloads use your Flex downloads.\n"
-                       "           Free accounts still have limits. Patch IDs are the last digits in share links\n"
-                       "   -r    Get remote patch from 3rd party (generally used to fetch from Sinfool repo)\n"
-                       , argv[0], sandbox.UTF8String, version.UTF8String);
-                return 1;
-            }
+#endif
+                case 't':
+                tweak = NO;
+                break;
+                case 'l':
+                logos = NO;
+                break;
+                case 's':
+                smart = YES;
+                break;
+                case 'o':
+                output = NO;
+                break;
+                case 'b':
+                color = NO;
+                break;
+                case '?': {
+                    printf("Usage: %s [OPTIONS]\n"
+                           " Naming:\n"
+                           "   -f    Set name of folder created for project (default is %s)\n"
+                           "   -n    Override the tweak name\n"
+                           "   -v    Set version (default is  %s)\n"
+                           " Output:\n"
+#if TARGET_OS_IPHONE
+                           "   -d    Only print available local patches, don't do anything (cannot be used with any other options)\n"
+#endif
+                           "   -t    Only print code to console\n"
+                           "   -l    Generate plain Obj-C instead of logos\n"
+                           "   -s    Enable smart comments\n"
+                           "   -o    Disable output, except errors\n"
+                           "   -b    Disable colors in output\n"
+                           " Source:\n"
+#if TARGET_OS_IPHONE
+                           "   -p    Directly plug in number\n"
+                           "   -c    Get patches directly from the cloud. Downloads use your Flex downloads.\n"
+                           "           Free accounts still have limits. Patch IDs are the last digits in share links\n"
+#endif
+                           "   -r    Get remote patch from 3rd party (generally used to fetch from Sinfool repo)\n"
+                           , argv[0], sandbox.UTF8String, version.UTF8String);
+                    return 1;
+                }
         }
     }
     
@@ -310,17 +333,23 @@ int main(int argc, char *argv[]) {
     NSString *appBundleKey;
     NSString *descriptionKey;
     if (patchID || remote) {
+        if (patchID && remote) {
+            puts("Cannot select multiple sources");
+            return 1;
+        }
+        
+#if TARGET_OS_IPHONE
         if (patchID) {
             NSDictionary *flexPrefs = [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.johncoates.Flex.plist"];
             NSString *udid = [UIDevice.currentDevice _deviceInfoForKey:@"UniqueDeviceID"];
             if (!udid) {
-                printf("Failed to get UDID, required to fetch patches from the cloud\n");
+                puts("Failed to get UDID, required to fetch patches from the cloud");
                 return 1;
             }
             
             NSString *sessionToken = flexPrefs[@"session"];
             if (!sessionToken) {
-                printf("Failed to get Flex session token, please open the app and make sure you're signed in\n");
+                puts("Failed to get Flex session token, please open the app and make sure you're signed in");
                 return 1;
             }
             
@@ -376,7 +405,9 @@ int main(int argc, char *argv[]) {
             }
             
             patch = getPatch;
-        } else if (remote) {
+        }
+#endif
+        if (remote) {
             patch = [NSDictionary dictionaryWithContentsOfURL:[NSURL URLWithString:remote]];
             if (!patch) {
                 printf("Bad remote patch\n");
@@ -388,6 +419,7 @@ int main(int argc, char *argv[]) {
         appBundleKey = @"applicationIdentifier";
         descriptionKey = @"description";
     } else {
+#if TARGET_OS_IPHONE
         NSDictionary *file;
         NSString *firstPath = @"/var/mobile/Library/Application Support/Flex3/patches.plist";
         NSString *secondPath = @"/var/mobile/Library/UserConfigurationProfiles/PublicInfo/Flex3Patches.plist";
@@ -398,13 +430,14 @@ int main(int argc, char *argv[]) {
         } else if ([fileManager fileExistsAtPath:secondPath]) {
             file = [NSDictionary dictionaryWithContentsOfFile:secondPath];
         } else {
-            printf("File not found, please ensure Flex 3 is installed\n"
-                   "If you're using an older version of Flex, please contact me at https://ipadkid.cf/contact\n");
+            puts("File not found, please ensure Flex 3 is installed\n"
+                 "If you're using an older version of Flex, please contact me at https://ipadkid.cf/contact");
             return 1;
         }
         
         NSArray *allPatches = file[@"patches"];
         unsigned long allPatchesCount = allPatches.count;
+        
         if (choice < 0) {
             for (unsigned int choose = 0; choose < allPatchesCount; choose++) {
                 printf("  %d: %s\n", choose, [allPatches[choose][@"name"] UTF8String]);
@@ -427,6 +460,10 @@ int main(int argc, char *argv[]) {
         titleKey = @"name";
         appBundleKey = @"appIdentifier";
         descriptionKey = @"cloudDescription";
+#else
+        puts("An external source is required");
+        return 1;
+#endif
     }
     
     BOOL uikit = NO;
@@ -505,18 +542,19 @@ int main(int argc, char *argv[]) {
         }
     } else {
         puts(genedCode.UTF8String);
-        
+#if TARGET_OS_IPHONE
         [UIPasteboard.generalPasteboard setValue:genedCode forPasteboardType:(id)kUTTypeUTF8PlainText];
-        
+#endif
         if (output) {
+#if TARGET_OS_IPHONE
             printf("%sOutput has successfully been copied to your clipboard. "
                    "You can now easily paste this output in your .%s file\n", greenColor, tweakFileExt.UTF8String);
-            
+#endif
             if (uikit) {
                 printf("\n%sPlease add UIKit to your project's FRAMEWORKS because this tweak includes color specifying\n", redColor);
             }
             
-            puts(resetColor);
+            printf("%s", resetColor);
         }
     }
     
