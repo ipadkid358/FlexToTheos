@@ -34,7 +34,7 @@
 NSString *codeFromFlexPatch(NSDictionary *patch, BOOL comments, BOOL *uikit, BOOL logos) {
     NSString *ret;
     @autoreleasepool {
-        NSMutableString *xm = [NSMutableString string];
+        NSMutableString *xm = [NSMutableString stringWithString:@"#import <UIKit/UIKit.h>\n\n"];
         
         if (!logos) {
             [xm appendString:@"#include <substrate.h>\n\n"];
@@ -42,8 +42,9 @@ NSString *codeFromFlexPatch(NSDictionary *patch, BOOL comments, BOOL *uikit, BOO
         
         NSString *swiftPatchStr = @"PatchedSwiftClassName";
         
-        NSMutableString *constructor = [NSMutableString stringWithString:@"static __attribute__((constructor)) void _logosLocalInit() {\n"];
+        NSMutableString *constructor = [NSMutableString stringWithString:@"static __attribute__((constructor)) void _fttLocalInit() {\n"];
         NSMutableArray<NSString *> *usedClasses = [NSMutableArray array];
+        NSMutableArray<NSString *> *usedMetaClasses = [NSMutableArray array];
         NSMutableArray<NSString *> *usedSwiftClasses = [NSMutableArray array];
         
         for (NSDictionary *unit in patch[@"units"]) {
@@ -62,6 +63,8 @@ NSString *codeFromFlexPatch(NSDictionary *patch, BOOL comments, BOOL *uikit, BOO
             NSArray<NSString *> *displayName = [flexDisplayName componentsSeparatedByString:@")"];
             NSString *bashedMethodTypeValue = displayName.firstObject;
             NSString *returnType = [bashedMethodTypeValue substringFromIndex:2];
+            
+            BOOL isClassMethod = [[returnType substringToIndex:1] isEqualToString:@"+"];
             
             NSMutableString *implArgList = [NSMutableString stringWithString:@"(id self, SEL _cmd"];
             NSMutableString *justArgCall = [NSMutableString stringWithString:@"(self, _cmd"];
@@ -111,7 +114,7 @@ NSString *codeFromFlexPatch(NSDictionary *patch, BOOL comments, BOOL *uikit, BOO
                         origValue = @"NULL";
                     } else if ([subToEight isEqualToString:@"FLcolor:"]) {
                         NSArray *color = [[origValue substringFromIndex:8] componentsSeparatedByString:@","];
-                        NSString *restrict colorBase = @"[UIColor colorWithRed:%@.0/255.0 green:%@.0/255.0 blue:%@.0/255.0 alpha:%@.0/255.0]";
+                        NSString *restrict colorBase = @"[UIColor colorWithRed:%@/255.0 green:%@/255.0 blue:%@/255.0 alpha:%@/255.0]";
                         origValue = [NSString stringWithFormat:colorBase, color[0], color[1], color[2], color[3]];
                         *uikit = YES;
                     } else {
@@ -171,6 +174,15 @@ NSString *codeFromFlexPatch(NSDictionary *patch, BOOL comments, BOOL *uikit, BOO
                 if (![usedClasses containsObject:className]) {
                     [constructor appendFormat:@"    Class %@ = objc_getClass(\"%@\");\n", internalClassName, className];
                     [usedClasses addObject:className];
+                }
+                
+                if (isClassMethod) {
+                    NSString *metaClassName = [@"_ftt_metaClass" stringByAppendingString:internalClassName];
+                    if (![usedMetaClasses containsObject:metaClassName]) {
+                        [constructor appendFormat:@"    Class %@ = objc_getClass(%@);\n", metaClassName, internalClassName];
+                        [usedMetaClasses addObject:metaClassName];
+                    }
+                    internalClassName = metaClassName;
                 }
                 
                 [constructor appendFormat:@"    MSHookMessageEx(%@, @selector(%@), (IMP)%@, ", internalClassName, selectorName, patchImplName];
@@ -233,85 +245,85 @@ int main(int argc, char *argv[]) {
     int c;
     while ((c = getopt(argc, argv, switchOpts)) != -1) {
         switch (c) {
-                case 'f': {
-                    sandbox = [NSString stringWithUTF8String:optarg];
-                    if ([[sandbox componentsSeparatedByString:@" "] count] > 1) {
-                        puts("Invalid folder name, spaces are not allowed, becuase they break make(1)");
-                        return 1;
-                    }
+            case 'f': {
+                sandbox = [NSString stringWithUTF8String:optarg];
+                if ([[sandbox componentsSeparatedByString:@" "] count] > 1) {
+                    puts("Invalid folder name, spaces are not allowed, becuase they break make(1)");
+                    return 1;
                 }
+            }
                 break;
-                case 'r':
+            case 'r':
                 remote = [NSString stringWithUTF8String:optarg];
                 break;
-                case 'n':
+            case 'n':
                 name = [NSString stringWithUTF8String:optarg];
                 break;
-                case 'v':
+            case 'v':
                 version = [NSString stringWithUTF8String:optarg];
                 break;
 #if TARGET_OS_IPHONE
-                case 'c': {
-                    patchID = [NSString stringWithUTF8String:optarg];
-                    unsigned int smallValidPatch = 6106;
-                    if (patchID.intValue < smallValidPatch) {
-                        printf("Sorry, this is an older patch, and not yet supported\n"
-                               "Please use a patch number greater than %d\n"
-                               "Patch numbers are the last digits in share links\n", smallValidPatch);
-                        return 1;
-                    }
+            case 'c': {
+                patchID = [NSString stringWithUTF8String:optarg];
+                unsigned int smallValidPatch = 6106;
+                if (patchID.intValue < smallValidPatch) {
+                    printf("Sorry, this is an older patch, and not yet supported\n"
+                           "Please use a patch number greater than %d\n"
+                           "Patch numbers are the last digits in share links\n", smallValidPatch);
+                    return 1;
                 }
+            }
                 break;
-                case 'p':
+            case 'p':
                 choice = [[NSString stringWithUTF8String:optarg] intValue];
                 break;
-                case 'd':
+            case 'd':
                 dump = YES;
                 break;
-                case 'g':
+            case 'g':
                 getPlist = YES;
                 break;
 #endif
-                case 't':
+            case 't':
                 tweak = NO;
                 break;
-                case 'l':
+            case 'l':
                 logos = NO;
                 break;
-                case 's':
+            case 's':
                 smart = YES;
                 break;
-                case 'o':
+            case 'o':
                 output = NO;
                 break;
-                case 'b':
+            case 'b':
                 color = NO;
                 break;
-                case '?': {
-                    printf("Usage: %s [OPTIONS]\n"
-                           " Naming:\n"
-                           "   -f    Set name of folder created for project (default is %s)\n"
-                           "   -n    Override the tweak name\n"
-                           "   -v    Set version (default is  %s)\n"
-                           " Output:\n"
+            case '?': {
+                printf("Usage: %s [OPTIONS]\n"
+                       " Naming:\n"
+                       "   -f    Set name of folder created for project (default is %s)\n"
+                       "   -n    Override the tweak name\n"
+                       "   -v    Set version (default is  %s)\n"
+                       " Output:\n"
 #if TARGET_OS_IPHONE
-                           "   -d    Only print available local patches, don't do anything (cannot be used with any other options)\n"
+                       "   -d    Only print available local patches, don't do anything (cannot be used with any other options)\n"
 #endif
-                           "   -t    Only print code to console\n"
-                           "   -l    Generate plain Obj-C instead of logos\n"
-                           "   -s    Enable smart comments\n"
-                           "   -o    Disable output, except errors\n"
-                           "   -b    Disable colors in output\n"
-                           " Source:\n"
+                       "   -t    Only print code to console\n"
+                       "   -l    Generate plain Obj-C instead of logos\n"
+                       "   -s    Enable smart comments\n"
+                       "   -o    Disable output, except errors\n"
+                       "   -b    Disable colors in output\n"
+                       " Source:\n"
 #if TARGET_OS_IPHONE
-                           "   -p    Directly plug in number\n"
-                           "   -c    Get patches directly from the cloud. Downloads use your Flex downloads.\n"
-                           "           Free accounts still have limits. Patch IDs are the last digits in share links\n"
+                       "   -p    Directly plug in number\n"
+                       "   -c    Get patches directly from the cloud. Downloads use your Flex downloads.\n"
+                       "           Free accounts still have limits. Patch IDs are the last digits in share links\n"
 #endif
-                           "   -r    Get remote patch from 3rd party (generally used to fetch from Sinfool repo)\n"
-                           , argv[0], sandbox.UTF8String, version.UTF8String);
-                    return 1;
-                }
+                       "   -r    Get remote patch from 3rd party (generally used to fetch from Sinfool repo)\n"
+                       , argv[0], sandbox.UTF8String, version.UTF8String);
+                return 1;
+            }
         }
     }
     
