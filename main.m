@@ -64,7 +64,7 @@ NSString *codeFromFlexPatch(NSDictionary *patch, BOOL comments, BOOL *uikit, BOO
             NSString *bashedMethodTypeValue = displayName.firstObject;
             NSString *returnType = [bashedMethodTypeValue substringFromIndex:2];
             
-            BOOL isClassMethod = [[returnType substringToIndex:1] isEqualToString:@"+"];
+            BOOL isClassMethod = [[bashedMethodTypeValue substringToIndex:1] isEqualToString:@"+"];
             
             NSMutableString *implArgList = [NSMutableString stringWithString:@"(id self, SEL _cmd"];
             NSMutableString *justArgCall = [NSMutableString stringWithString:@"(self, _cmd"];
@@ -179,7 +179,7 @@ NSString *codeFromFlexPatch(NSDictionary *patch, BOOL comments, BOOL *uikit, BOO
                 if (isClassMethod) {
                     NSString *metaClassName = [@"_ftt_metaClass" stringByAppendingString:internalClassName];
                     if (![usedMetaClasses containsObject:metaClassName]) {
-                        [constructor appendFormat:@"    Class %@ = objc_getClass(%@);\n", metaClassName, internalClassName];
+                        [constructor appendFormat:@"    Class %@ = object_getClass(%@);\n", metaClassName, internalClassName];
                         [usedMetaClasses addObject:metaClassName];
                     }
                     internalClassName = metaClassName;
