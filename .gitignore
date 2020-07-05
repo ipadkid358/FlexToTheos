@@ -1,0 +1,6 @@
+# OS X noise
+.DS_Store
+.AppleDouble
+._*
+.theos
+packages
