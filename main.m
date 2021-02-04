@@ -71,7 +71,7 @@ NSString *codeFromFlexPatch(NSDictionary *patch, BOOL comments, BOOL *uikit, BOO
             NSMutableString *justArgType = [NSMutableString stringWithString:@"(id, SEL"];
             
             NSMutableString *realMethodName = [NSMutableString string];
-            [realMethodName appendString:[bashedMethodTypeValue stringByReplacingOccurrencesOfString:@"(" withString:@" ("]];
+            [realMethodName appendString:bashedMethodTypeValue];
             [realMethodName appendFormat:@")%@", [displayName[1] substringFromIndex:1]];
             
             for (int displayId = 1; displayId < displayName.count-1; displayId++) {
