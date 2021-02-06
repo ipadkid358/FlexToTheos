@@ -60,7 +60,8 @@ NSString *codeFromFlexPatch(NSDictionary *patch, BOOL comments, BOOL *uikit, BOO
             NSString *patchImplName = [NSString stringWithFormat:@"_patched%@", implMainName];
             
             NSString *flexDisplayName = objcInfo[@"displayName"];
-            NSArray<NSString *> *displayName = [flexDisplayName componentsSeparatedByString:@")"];
+            NSString *flexDisplayNameFix = [flexDisplayName stringByReplacingOccurrencesOfString:@"- (" withString:@"- ("];
+            NSArray<NSString *> *displayName = [flexDisplayNameFix componentsSeparatedByString:@")"];
             NSString *bashedMethodTypeValue = displayName.firstObject;
             NSString *returnType = [bashedMethodTypeValue substringFromIndex:2];
             
@@ -71,7 +72,7 @@ NSString *codeFromFlexPatch(NSDictionary *patch, BOOL comments, BOOL *uikit, BOO
             NSMutableString *justArgType = [NSMutableString stringWithString:@"(id, SEL"];
             
             NSMutableString *realMethodName = [NSMutableString string];
-            [realMethodName appendString:[bashedMethodTypeValue stringByReplacingOccurrencesOfString:@"(" withString:@" ("]];
+            [realMethodName appendString:bashedMethodTypeValue];
             [realMethodName appendFormat:@")%@", [displayName[1] substringFromIndex:1]];
             
             for (int displayId = 1; displayId < displayName.count-1; displayId++) {
