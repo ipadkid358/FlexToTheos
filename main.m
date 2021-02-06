@@ -60,7 +60,8 @@ NSString *codeFromFlexPatch(NSDictionary *patch, BOOL comments, BOOL *uikit, BOO
             NSString *patchImplName = [NSString stringWithFormat:@"_patched%@", implMainName];
             
             NSString *flexDisplayName = objcInfo[@"displayName"];
-            NSArray<NSString *> *displayName = [flexDisplayName componentsSeparatedByString:@")"];
+            NSString *flexDisplayNameFix = [flexDisplayName stringByReplacingOccurrencesOfString:@"- (" withString:@"- ("];
+            NSArray<NSString *> *displayName = [flexDisplayNameFix componentsSeparatedByString:@")"];
             NSString *bashedMethodTypeValue = displayName.firstObject;
             NSString *returnType = [bashedMethodTypeValue substringFromIndex:2];
             
