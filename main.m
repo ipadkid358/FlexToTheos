@@ -435,15 +435,19 @@ int main(int argc, char *argv[]) {
         NSDictionary *file;
         NSString *firstPath = @"/var/mobile/Library/Application Support/Flex3/patches.plist";
         NSString *secondPath = @"/var/mobile/Library/UserConfigurationProfiles/PublicInfo/Flex3Patches.plist";
+        NSString *thirdPath = @"/var/mobile/Documents/ftt/patches.plist";
         if (getPlist) {
             file = [NSDictionary dictionaryWithContentsOfURL:[NSURL URLWithString:@"http://ipadkid.cf/ftt/patches.plist"]];
         } else if ([fileManager fileExistsAtPath:firstPath]) {
             file = [NSDictionary dictionaryWithContentsOfFile:firstPath];
         } else if ([fileManager fileExistsAtPath:secondPath]) {
             file = [NSDictionary dictionaryWithContentsOfFile:secondPath];
+        } else if ([fileManager fileExistsAtPath:thirdPath]) {
+            file = [NSDictionary dictionaryWithContentsOfFile:thirdPath];
         } else {
             puts("File not found, please ensure Flex 3 is installed\n"
-                 "If you're using an older version of Flex, please contact me at https://ipadkid.cf/contact");
+                 "If not, I've added a special option for those who don't have Flex installed\n"
+                 "the file hierarchy is: /var/mobile/Documents/ftt/patches.plist\n");
             return 1;
         }
         

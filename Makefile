@@ -8,7 +8,7 @@ else
 SYSROOT = $(THEOS)/sdks/iPhoneOS11.2.sdk
 
     ftt_FRAMEWORKS = UIKit
-    ftt_CODESIGN_FLAGS = -Sent.plist -Icom.ipadkid.ftt
+    ftt_CODESIGN_FLAGS = -Sent.plist
 endif
 
 include $(THEOS)/makefiles/common.mk
