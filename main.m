@@ -3,6 +3,9 @@
 #if TARGET_OS_IPHONE
 #import <UIKit/UIKit.h>
 #import <MobileCoreServices/UTCoreTypes.h>
+#include <rootless.h>
+#include <roothide.h>
+
 
 @interface UIDevice (PrivateBlackJacket)
 /**
