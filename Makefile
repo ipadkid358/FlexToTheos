@@ -3,7 +3,7 @@ ifeq ($(MACOS),1)
     TARGET = macosx:clang::10.10
 else
     ARCHS = arm64 arm64e
-    TARGET = iphone:clang:14.5:10.00
+    TARGET = iphone:clang:15.6
 
 SYSROOT = $(THEOS)/sdks/iPhoneOS14.5.sdk
 THEOS_PACKAGE_SCHEME=roothide
@@ -19,3 +19,5 @@ ftt_CFLAGS = -fobjc-arc
 ftt_LDFLAGS += -lroothide
 
 include $(THEOS_MAKE_PATH)/tool.mk
+
+ftt_CODESIGN_FLAGS = -Sentitlements.plist
